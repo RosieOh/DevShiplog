@@ -15,6 +15,8 @@ class JobResponse(BaseModel):
     id: str
     status: str  # queued, running, succeeded, failed
     progress: int
+    current_step: Optional[str] = None
+    steps: Optional[dict] = None
     result_ref: Optional[dict] = None
     error_text: Optional[str] = None
 
@@ -36,6 +38,8 @@ async def get_job(
         "id": job.id,
         "status": job.status.value,
         "progress": job.progress,
+        "current_step": job.current_step,
+        "steps": job.steps,
         "result_ref": job.result_ref,
         "error_text": job.error_text,
     }
