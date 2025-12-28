@@ -5,6 +5,20 @@ from alembic import context
 from infrastructure.database.session import Base
 from infrastructure.config.settings import settings
 
+# Import all models to ensure they are registered with Base.metadata
+from infrastructure.database.models import (
+    user,
+    draft,
+    draft_version,
+    source,
+    style_profile,
+    job,
+    template,
+    schedule,
+    risk_finding,
+    usage_log,
+)
+
 # this is the Alembic Config object
 config = context.config
 
