@@ -27,4 +27,5 @@ class StyleProfile(Base):
     # Relationships
     user = relationship("User", back_populates="style_profiles")
     drafts = relationship("Draft", back_populates="style_profile")
+    templates = relationship("Template", back_populates="style_profile")
 
