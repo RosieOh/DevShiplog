@@ -4,7 +4,7 @@ from typing import List
 
 class Settings(BaseSettings):
     # Database
-    DATABASE_URL: str = "mysql+pymysql://devshiplog:devshiplog@localhost:3306/devshiplog"
+    DATABASE_URL: str = "mysql+pymysql://root:1234@localhost:3306/devshiplog"
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
