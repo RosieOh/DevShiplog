@@ -29,6 +29,8 @@ class Job(Base):
     type = Column(Enum(JobType), nullable=False)
     status = Column(Enum(JobStatus), default=JobStatus.QUEUED, index=True)
     progress = Column(Integer, default=0)
+    current_step = Column(String(50))  # ingest, outline, draft, style, safety, polish
+    steps = Column(JSON)  # 단계별 진행률 정보
     result_ref = Column(JSON)  # 결과 참조 (draft_id 등)
     error_text = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
