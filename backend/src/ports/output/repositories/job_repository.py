@@ -23,6 +23,8 @@ class JobRepository(ABC):
         job_id: str,
         status: JobStatus,
         progress: int = None,
+        current_step: str = None,
+        steps: dict = None,
         result_ref: dict = None,
         error_text: str = None,
     ) -> Job:
