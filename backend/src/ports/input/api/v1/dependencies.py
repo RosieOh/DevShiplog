@@ -42,3 +42,7 @@ def get_llm_service():
 def get_crawler_service():
     return CrawlerServiceImpl()
 
+
+# get_db는 infrastructure.database.session에서 직접 import
+from infrastructure.database.session import get_db
+
