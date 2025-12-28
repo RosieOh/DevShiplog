@@ -22,6 +22,9 @@ export interface Draft {
   type: string
   audience: string
   length_preset: string
+  tags?: string[]
+  notes?: string
+  checklist?: Array<{id: string, text: string, checked: boolean}>
   latest_version?: {
     version_no: number
     content_md: string
@@ -67,6 +70,30 @@ export const draftService = {
   exportMarkdown: async (draftId: string): Promise<Blob> => {
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/export/drafts/${draftId}/export/md`)
     return response.blob()
+  },
+
+  delete: async (draftId: string): Promise<void> => {
+    return apiClient.delete(`/api/v1/drafts/${draftId}`)
+  },
+
+  update: async (draftId: string, data: { tags?: string[], notes?: string, checklist?: any[] }): Promise<void> => {
+    return apiClient.put(`/api/v1/drafts/${draftId}`, data)
+  },
+
+  generateOutline: async (data: { source_ids: string[], type: string, audience: string, length: string }): Promise<any> => {
+    return apiClient.post('/api/v1/drafts/generate-outline', data)
+  },
+
+  getOutline: async (draftId: string): Promise<any> => {
+    return apiClient.get(`/api/v1/drafts/${draftId}/outline`)
+  },
+
+  updateOutline: async (draftId: string, outline: any): Promise<void> => {
+    return apiClient.put(`/api/v1/drafts/${draftId}/outline`, { outline })
+  },
+
+  compareVersions: async (draftId: string, version1Id: string, version2Id: string): Promise<any> => {
+    return apiClient.get(`/api/v1/drafts/${draftId}/compare?version1_id=${version1Id}&version2_id=${version2Id}`)
   },
 }
 
