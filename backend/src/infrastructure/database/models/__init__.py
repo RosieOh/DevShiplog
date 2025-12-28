@@ -6,6 +6,8 @@ from infrastructure.database.models.draft_version import DraftVersion
 from infrastructure.database.models.risk_finding import RiskFinding
 from infrastructure.database.models.job import Job
 from infrastructure.database.models.usage_log import UsageLog
+from infrastructure.database.models.template import Template
+from infrastructure.database.models.schedule import Schedule
 
 __all__ = [
     "User",
@@ -16,5 +18,7 @@ __all__ = [
     "RiskFinding",
     "Job",
     "UsageLog",
+    "Template",
+    "Schedule",
 ]
 
