@@ -34,6 +34,8 @@ class JobRepositoryImpl(JobRepository):
         job_id: str,
         status: JobStatus,
         progress: int = None,
+        current_step: str = None,
+        steps: dict = None,
         result_ref: dict = None,
         error_text: str = None,
     ) -> Job:
@@ -44,6 +46,10 @@ class JobRepositoryImpl(JobRepository):
         job.status = status
         if progress is not None:
             job.progress = progress
+        if current_step is not None:
+            job.current_step = current_step
+        if steps is not None:
+            job.steps = steps
         if result_ref is not None:
             job.result_ref = result_ref
         if error_text is not None:
