@@ -17,6 +17,7 @@ import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import Toast from '@/components/ui/Toast'
 import SessionProvider from '@/components/providers/SessionProvider'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 export default function RootLayout({
   children,
@@ -29,16 +30,18 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className={inter.className}>
-        <SessionProvider>
-          <div className="flex flex-col min-h-screen">
-            <Header />
-            <main className="flex-grow pt-20">
-              {children}
-            </main>
-            <Footer />
-            <Toast />
-          </div>
-        </SessionProvider>
+        <ErrorBoundary>
+          <SessionProvider>
+            <div className="flex flex-col min-h-screen">
+              <Header />
+              <main className="flex-grow pt-20">
+                {children}
+              </main>
+              <Footer />
+              <Toast />
+            </div>
+          </SessionProvider>
+        </ErrorBoundary>
       </body>
     </html>
   )
