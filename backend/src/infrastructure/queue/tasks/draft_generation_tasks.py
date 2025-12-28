@@ -24,7 +24,16 @@ def generate_draft_task(job_id: str, draft_id: str, source_ids: list[str]):
         if not job:
             return
 
-        job_repo.update_status(job_id, JobStatus.RUNNING, progress=10)
+        # 단계별 진행률 초기화
+        steps = {
+            "ingest": {"status": "running", "progress": 0},
+            "outline": {"status": "pending", "progress": 0},
+            "draft": {"status": "pending", "progress": 0},
+            "style": {"status": "pending", "progress": 0},
+            "safety": {"status": "pending", "progress": 0},
+            "polish": {"status": "pending", "progress": 0},
+        }
+        job_repo.update_status(job_id, JobStatus.RUNNING, progress=5, current_step="ingest", steps=steps)
 
         try:
             # Draft 조회
@@ -47,7 +56,9 @@ def generate_draft_task(job_id: str, draft_id: str, source_ids: list[str]):
                 if profile and profile.profile_json:
                     style_profile = profile.profile_json
 
-            job_repo.update_status(job_id, JobStatus.RUNNING, progress=30)
+            steps["ingest"] = {"status": "completed", "progress": 100}
+            steps["outline"] = {"status": "running", "progress": 0}
+            job_repo.update_status(job_id, JobStatus.RUNNING, progress=15, current_step="outline", steps=steps)
 
             import asyncio
             # Outline 생성
@@ -58,7 +69,9 @@ def generate_draft_task(job_id: str, draft_id: str, source_ids: list[str]):
                 length_preset=draft.length_preset or "default",
             ))
 
-            job_repo.update_status(job_id, JobStatus.RUNNING, progress=50)
+            steps["outline"] = {"status": "completed", "progress": 100}
+            steps["draft"] = {"status": "running", "progress": 0}
+            job_repo.update_status(job_id, JobStatus.RUNNING, progress=40, current_step="draft", steps=steps)
 
             # Draft 생성 (스트리밍)
             async def collect_draft():
@@ -75,11 +88,25 @@ def generate_draft_task(job_id: str, draft_id: str, source_ids: list[str]):
 
             draft_content = asyncio.run(collect_draft())
 
-            job_repo.update_status(job_id, JobStatus.RUNNING, progress=80)
+            steps["draft"] = {"status": "completed", "progress": 100}
+            if style_profile:
+                steps["style"] = {"status": "running", "progress": 0}
+            else:
+                steps["style"] = {"status": "skipped", "progress": 100}
+            job_repo.update_status(job_id, JobStatus.RUNNING, progress=60, current_step="style" if style_profile else "safety", steps=steps)
 
             # Style 적용 (있는 경우)
             if style_profile:
                 draft_content = asyncio.run(llm_service.apply_style(draft_content, style_profile))
+                steps["style"] = {"status": "completed", "progress": 100}
+            
+            steps["safety"] = {"status": "running", "progress": 0}
+            job_repo.update_status(job_id, JobStatus.RUNNING, progress=80, current_step="safety", steps=steps)
+
+            # Safety 검사는 나중에 수동으로 실행하므로 스킵
+            steps["safety"] = {"status": "skipped", "progress": 100}
+            steps["polish"] = {"status": "running", "progress": 0}
+            job_repo.update_status(job_id, JobStatus.RUNNING, progress=90, current_step="polish", steps=steps)
 
             # Version 생성
             draft_repo.create_version(
@@ -93,6 +120,7 @@ def generate_draft_task(job_id: str, draft_id: str, source_ids: list[str]):
                 },
             )
 
+            steps["polish"] = {"status": "completed", "progress": 100}
             job_repo.update_status(
                 job_id,
                 JobStatus.SUCCEEDED,
