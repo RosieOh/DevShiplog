@@ -18,8 +18,12 @@ security = HTTPBearer()
 
 class RegisterRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str  # 최대 72바이트 (약 72자, UTF-8 인코딩에 따라 다름)
     name: str
+    
+    class Config:
+        # 비밀번호 길이 검증은 선택사항 (프론트엔드에서 처리 권장)
+        pass
 
 
 class LoginRequest(BaseModel):
