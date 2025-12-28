@@ -26,6 +26,9 @@ export default function NewDraftPage() {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [extracting, setExtracting] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
+  const [outline, setOutline] = useState<any>(null)
+  const [generatingOutline, setGeneratingOutline] = useState(false)
+  const [showOutlinePreview, setShowOutlinePreview] = useState(false)
 
   const { generateDraft, loading, error, draftId, jobId } = useDraftGeneration()
   const { jobStatus } = useJobStatus(jobId)
@@ -97,6 +100,39 @@ export default function NewDraftPage() {
       })
     } finally {
       setExtracting(false)
+    }
+  }
+
+  const handleGenerateOutline = async () => {
+    if (sourceIds.length === 0) {
+      addToast({
+        message: '먼저 소스를 추출해주세요.',
+        type: 'error',
+      })
+      return
+    }
+
+    try {
+      setGeneratingOutline(true)
+      const result = await draftService.generateOutline({
+        source_ids: sourceIds,
+        type: draftType,
+        audience,
+        length,
+      })
+      setOutline(result.outline)
+      setShowOutlinePreview(true)
+      addToast({
+        message: '목차가 생성되었습니다.',
+        type: 'success',
+      })
+    } catch (err: any) {
+      addToast({
+        message: `목차 생성 실패: ${err.message}`,
+        type: 'error',
+      })
+    } finally {
+      setGeneratingOutline(false)
     }
   }
 
@@ -268,13 +304,71 @@ export default function NewDraftPage() {
               </div>
 
               {sourceIds.length > 0 && (
-                <div className="p-4 bg-[#d1fb52]/20 border border-[#d1fb52]/30 rounded-2xl">
-                  <p className="text-black font-semibold">
-                    ✓ {sourceIds.length}개의 소스가 준비되었습니다.
-                  </p>
+                <div className="space-y-4">
+                  <div className="p-4 bg-[#d1fb52]/20 border border-[#d1fb52]/30 rounded-2xl">
+                    <p className="text-black font-semibold">
+                      ✓ {sourceIds.length}개의 소스가 준비되었습니다.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleGenerateOutline}
+                    disabled={generatingOutline}
+                    className="w-full px-6 py-4 bg-white border-2 border-[#d1fb52] text-black rounded-full hover:scale-105 transition-transform font-semibold disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    {generatingOutline ? '목차 생성 중...' : '📋 목차 미리보기'}
+                  </button>
                 </div>
               )}
             </div>
+
+            {/* 목차 미리보기 */}
+            {showOutlinePreview && outline && (
+              <div className="bg-white rounded-[32px] border border-black/5 p-8">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-[#111111]">목차 미리보기</h2>
+                  <button
+                    onClick={() => setShowOutlinePreview(false)}
+                    className="text-[#666666] hover:text-[#111111] transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+                
+                {(outline.title_candidates || outline.titleCandidates) && (outline.title_candidates || outline.titleCandidates).length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-[#666666] mb-3">제목 후보</h3>
+                    <div className="space-y-2">
+                      {(outline.title_candidates || outline.titleCandidates).map((title: string, idx: number) => (
+                        <div key={idx} className="p-3 bg-[#f9f9f7] rounded-xl border border-black/5">
+                          {title}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {outline.toc && outline.toc.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-[#666666] mb-3">목차</h3>
+                    <ol className="space-y-2 list-decimal list-inside">
+                      {outline.toc.map((item: any, idx: number) => (
+                        <li key={idx} className="p-3 bg-[#f9f9f7] rounded-xl border border-black/5">
+                          {typeof item === 'string' ? item : item.heading || item}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleGenerateDraft}
+                  disabled={loading}
+                  className="w-full mt-6 px-6 py-4 bg-[#d1fb52] text-black rounded-full hover:scale-105 transition-transform font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  {loading ? '초안 생성 중...' : '이 목차로 초안 생성'}
+                </button>
+              </div>
+            )}
 
             <div className="bg-white rounded-[32px] border border-black/5 p-8">
               <h2 className="text-2xl font-bold mb-6 text-[#111111]">생성 옵션</h2>
@@ -389,6 +483,59 @@ export default function NewDraftPage() {
                       ></div>
                     </div>
                   )}
+                  
+                  {/* 단계별 진행률 */}
+                  {jobStatus.steps && (
+                    <div className="mt-6 space-y-3">
+                      <h3 className="text-sm font-semibold text-[#666666] mb-3">단계별 진행</h3>
+                      {Object.entries(jobStatus.steps).map(([step, data]: [string, any]) => {
+                        const stepNames: Record<string, string> = {
+                          ingest: '소스 수집',
+                          outline: '목차 생성',
+                          draft: '본문 작성',
+                          style: '스타일 적용',
+                          safety: '안전 검사',
+                          polish: '최종 정리',
+                        }
+                        const isActive = jobStatus.current_step === step
+                        const isCompleted = data.status === 'completed'
+                        const isSkipped = data.status === 'skipped'
+                        
+                        return (
+                          <div
+                            key={step}
+                            className={`p-3 rounded-xl border transition-all ${
+                              isActive
+                                ? 'bg-[#d1fb52]/20 border-[#d1fb52]'
+                                : isCompleted
+                                ? 'bg-green-50 border-green-200'
+                                : isSkipped
+                                ? 'bg-gray-50 border-gray-200 opacity-60'
+                                : 'bg-gray-50 border-gray-200'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-semibold text-[#111111]">
+                                {stepNames[step] || step}
+                              </span>
+                              {isCompleted && <span className="text-green-600">✓</span>}
+                              {isSkipped && <span className="text-gray-400">⊘</span>}
+                              {isActive && <span className="text-[#d1fb52] animate-pulse">●</span>}
+                            </div>
+                            {isActive && (
+                              <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+                                <div
+                                  className="bg-[#d1fb52] h-1.5 rounded-full transition-all"
+                                  style={{ width: `${data.progress || 0}%` }}
+                                ></div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                  
                   {jobStatus.error_text && (
                     <div className="p-4 bg-red-50 border border-red-200 rounded-2xl">
                       <p className="text-red-700 text-sm">{jobStatus.error_text}</p>
