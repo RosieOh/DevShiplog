@@ -1,13 +1,14 @@
 """이미지 업로드 (인증 필요)."""
 
+from typing import Dict
+
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel
 
+from src.application.use_cases.upload.upload_image import DeleteUploadUseCase, UploadImageUseCase
+from src.domain.services.images import UnsupportedFileError
 from src.infrastructure.config.settings import settings
-from src.infrastructure.external.storage.local_storage import (
-    LocalStorageService,
-    UnsupportedFileError,
-)
+from src.infrastructure.external.storage import get_storage
 from src.ports.input.api.v1.dependencies import (
     client_identity,
     enforce_rate_limit,
@@ -24,6 +25,8 @@ class UploadResponse(BaseModel):
     key: str
     size: int
     content_type: str
+    # {"original": "...", "w1200": "...", "w400": "..."} — 없는 크기는 빠진다.
+    variants: Dict[str, str] = {}
 
 
 def _store(request: Request, user_id: str, file: UploadFile, prefix: str) -> UploadResponse:
@@ -39,12 +42,7 @@ def _store(request: Request, user_id: str, file: UploadFile, prefix: str) -> Upl
 
     data = file.file.read(settings.MAX_UPLOAD_BYTES + 1)
     try:
-        stored = LocalStorageService().save(
-            data=data,
-            filename=file.filename or "upload",
-            content_type=file.content_type or "",
-            prefix=prefix,
-        )
+        stored = UploadImageUseCase(get_storage()).execute(data=data, prefix=prefix)
     except UnsupportedFileError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -68,7 +66,15 @@ def upload_avatar(
     user_id: str = Depends(get_current_user_id),
     user_repo: UserRepository = Depends(get_user_repo),
 ):
-    """프로필 사진 업로드. 업로드와 동시에 프로필에 반영한다."""
+    """프로필 사진 업로드. 업로드와 동시에 프로필에 반영하고 이전 사진은 지운다."""
+    previous = user_repo.get_by_id(user_id)
+    previous_avatar = previous.avatar_url if previous else None
+
     result = _store(request, user_id, file, prefix="avatars")
     user_repo.update_profile(user_id=user_id, avatar_url=result.url)
+
+    # 교체된 이전 사진은 아무도 참조하지 않는다. 남겨두면 디스크에 계속 쌓인다.
+    if previous_avatar and previous_avatar != result.url:
+        DeleteUploadUseCase(get_storage()).execute(previous_avatar)
+
     return result
