@@ -1,11 +1,27 @@
 from typing import Optional
 
-from fastapi import Depends, HTTPException, Query, status
+from fastapi import Depends, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from src.infrastructure.auth.jwt_handler import decode_access_token
 from src.infrastructure.database.repositories.draft_repository_impl import DraftRepositoryImpl
+from src.infrastructure.database.repositories.moderation_repository_impl import (
+    BlockRepositoryImpl,
+    ReportRepositoryImpl,
+)
+from src.infrastructure.database.repositories.post_repository_impl import PostRepositoryImpl
+from src.infrastructure.database.repositories.social_repository_impl import (
+    CommentRepositoryImpl,
+    FollowRepositoryImpl,
+    LikeRepositoryImpl,
+    NotificationRepositoryImpl,
+)
+from src.infrastructure.database.repositories.taxonomy_repository_impl import (
+    SeriesRepositoryImpl,
+    TagRepositoryImpl,
+)
+from src.infrastructure.ratelimit.limiter import rate_limiter
 from src.infrastructure.database.repositories.job_repository_impl import JobRepositoryImpl
 from src.infrastructure.database.repositories.risk_finding_repository_impl import (
     RiskFindingRepositoryImpl,
@@ -99,8 +115,89 @@ def get_usage_log_repo(db: Session = Depends(get_db)) -> UsageLogRepositoryImpl:
     return UsageLogRepositoryImpl(db)
 
 
+# ------------------------------------------------------ 블로그 플랫폼 repositories
+
+
+def get_post_repo(db: Session = Depends(get_db)) -> PostRepositoryImpl:
+    return PostRepositoryImpl(db)
+
+
+def get_tag_repo(db: Session = Depends(get_db)) -> TagRepositoryImpl:
+    return TagRepositoryImpl(db)
+
+
+def get_series_repo(db: Session = Depends(get_db)) -> SeriesRepositoryImpl:
+    return SeriesRepositoryImpl(db)
+
+
+def get_comment_repo(db: Session = Depends(get_db)) -> CommentRepositoryImpl:
+    return CommentRepositoryImpl(db)
+
+
+def get_like_repo(db: Session = Depends(get_db)) -> LikeRepositoryImpl:
+    return LikeRepositoryImpl(db)
+
+
+def get_follow_repo(db: Session = Depends(get_db)) -> FollowRepositoryImpl:
+    return FollowRepositoryImpl(db)
+
+
+def get_notification_repo(db: Session = Depends(get_db)) -> NotificationRepositoryImpl:
+    return NotificationRepositoryImpl(db)
+
+
+def get_report_repo(db: Session = Depends(get_db)) -> ReportRepositoryImpl:
+    return ReportRepositoryImpl(db)
+
+
+def get_block_repo(db: Session = Depends(get_db)) -> BlockRepositoryImpl:
+    return BlockRepositoryImpl(db)
+
+
 # ------------------------------------------------------------------- services
 
 
 def get_crawler_service() -> CrawlerServiceImpl:
     return CrawlerServiceImpl()
+
+
+# ---------------------------------------------------------------- rate limiting
+
+
+def get_optional_user_id(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Optional[str]:
+    """로그인했으면 사용자 ID, 아니면 None.
+
+    공개 페이지에서 "내가 좋아요를 눌렀는지" 같은 개인화 정보를 곁들일 때 쓴다.
+    인증이 없어도 401 을 내지 않는다.
+    """
+    if not credentials or not credentials.credentials:
+        return None
+    payload = decode_access_token(credentials.credentials)
+    if not payload:
+        return None
+    user_id = payload.get("sub")
+    return user_id if isinstance(user_id, str) else None
+
+
+def enforce_rate_limit(action: str, identity: str) -> None:
+    """제한을 넘으면 429. 라우터에서 직접 호출한다."""
+    decision = rate_limiter.check(action, identity)
+    if not decision.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.",
+            headers={"Retry-After": str(decision.retry_after)},
+        )
+
+
+def client_identity(request: Request, user_id: Optional[str] = None) -> str:
+    """레이트리밋 키. 로그인 사용자는 ID, 익명은 IP 기준."""
+    if user_id:
+        return f"u:{user_id}"
+    forwarded = request.headers.get("x-forwarded-for", "")
+    ip = forwarded.split(",")[0].strip() if forwarded else (
+        request.client.host if request.client else "unknown"
+    )
+    return f"ip:{ip}"
