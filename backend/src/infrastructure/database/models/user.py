@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
-from infrastructure.database.session import Base
+from src.infrastructure.database.session import Base
 
 
 class User(Base):
