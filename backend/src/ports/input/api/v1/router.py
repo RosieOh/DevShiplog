@@ -12,6 +12,7 @@ from src.ports.input.api.v1 import (
     social,
     sources,
     style_profiles,
+    uploads,
     usage,
 )
 
@@ -33,6 +34,7 @@ api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 api_router.include_router(safety.router, prefix="/safety", tags=["safety"])
 api_router.include_router(export.router, prefix="/export", tags=["export"])
 api_router.include_router(usage.router, prefix="/usage", tags=["usage"])
+api_router.include_router(uploads.router, prefix="/uploads", tags=["uploads"])
 
 # --- 블로그 플랫폼 ---------------------------------------------------------
 api_router.include_router(posts.router, prefix="/posts", tags=["posts"])
