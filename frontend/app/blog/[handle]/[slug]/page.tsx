@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import Avatar from '@/components/ui/Avatar'
 import Markdown from '@/components/blog/Markdown'
 import PostActions from '@/components/blog/PostActions'
 import CommentSection from '@/components/blog/CommentSection'
@@ -71,21 +72,21 @@ export default async function PostPage({ params }: Props) {
   }
 
   return (
-    <div className="bg-canvas min-h-screen">
+    <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <article className="mx-auto max-w-[760px] px-[5%] py-12">
-        <header className="border-b border-black/10 pb-8">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-ink text-balance">
+      <article className="mx-auto max-w-content px-4 py-12 md:px-6">
+        <header>
+          <h1 className="text-[2rem] font-extrabold leading-[1.3] tracking-tight text-ink text-balance md:text-[2.5rem]">
             {post.title}
           </h1>
 
-          <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-muted">
+          <div className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-muted">
             <Link
               href={`/@${post.author.handle}`}
-              className="font-semibold text-ink hover:underline underline-offset-2"
+              className="font-bold text-ink hover:underline underline-offset-2"
             >
               {post.author.display_name}
             </Link>
@@ -101,7 +102,7 @@ export default async function PostPage({ params }: Props) {
                 <li key={tag}>
                   <Link
                     href={`/tags/${encodeURIComponent(tag.toLowerCase())}`}
-                    className="inline-flex items-center rounded-full bg-surface border border-black/10 px-3 py-1 text-xs font-medium text-ink-muted transition-colors hover:text-ink"
+                    className="inline-flex items-center rounded-full bg-accent/12 px-3.5 py-1.5 text-sm font-medium text-accent-text transition-colors hover:bg-accent/20"
                   >
                     {tag}
                   </Link>
@@ -111,7 +112,16 @@ export default async function PostPage({ params }: Props) {
           )}
         </header>
 
-        <div className="py-10">
+        {post.cover_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={post.cover_url}
+            alt=""
+            className="mt-10 w-full rounded object-cover"
+          />
+        )}
+
+        <div className="py-12">
           <Markdown>{post.content_md}</Markdown>
         </div>
 
@@ -123,6 +133,30 @@ export default async function PostPage({ params }: Props) {
           isMine={post.is_mine}
         />
 
+        {/* 글 끝에서 작성자를 다시 보여준다 — 읽고 나서야 "누가 썼지" 가 궁금해진다. */}
+        <aside className="mt-12 flex items-start gap-4 border-t border-border pt-10">
+          <Link href={`/@${post.author.handle}`} aria-hidden="true" tabIndex={-1}>
+            <Avatar
+              handle={post.author.handle}
+              displayName={post.author.display_name}
+              src={post.author.avatar_url}
+              size={64}
+            />
+          </Link>
+          <div className="min-w-0">
+            <Link
+              href={`/@${post.author.handle}`}
+              className="text-xl font-bold text-ink hover:underline underline-offset-2"
+            >
+              {post.author.display_name}
+            </Link>
+            <p className="text-sm text-ink-faint">@{post.author.handle}</p>
+            {post.author.bio && (
+              <p className="mt-2 text-sm leading-relaxed text-ink-muted">{post.author.bio}</p>
+            )}
+          </div>
+        </aside>
+
         <CommentSection
           postId={post.id}
           handle={handle}
@@ -131,6 +165,6 @@ export default async function PostPage({ params }: Props) {
           commentCount={post.comment_count}
         />
       </article>
-    </div>
+    </>
   )
 }
