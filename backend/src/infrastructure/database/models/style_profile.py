@@ -1,16 +1,12 @@
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum, JSON
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum, JSON, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
-import enum
-from infrastructure.database.session import Base
 
+from src.domain.enums import StyleProfileStatus
+from src.infrastructure.database.session import Base
 
-class StyleProfileStatus(str, enum.Enum):
-    QUEUED = "queued"
-    RUNNING = "running"
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
+__all__ = ["StyleProfile", "StyleProfileStatus"]
 
 
 class StyleProfile(Base):
@@ -22,9 +18,9 @@ class StyleProfile(Base):
     sample_count = Column(Integer, default=5)
     status = Column(Enum(StyleProfileStatus), default=StyleProfileStatus.QUEUED)
     profile_json = Column(JSON)
+    error_text = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
     # Relationships
     user = relationship("User", back_populates="style_profiles")
     drafts = relationship("Draft", back_populates="style_profile")
-
