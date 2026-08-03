@@ -5,6 +5,7 @@ import Avatar from '@/components/ui/Avatar'
 import Markdown from '@/components/blog/Markdown'
 import PostActions from '@/components/blog/PostActions'
 import CommentSection from '@/components/blog/CommentSection'
+import SeriesNav from '@/components/blog/SeriesNav'
 import TableOfContents from '@/components/blog/TableOfContents'
 import FloatingActions from '@/components/blog/FloatingActions'
 import { extractToc } from '@/lib/toc'
@@ -136,9 +137,19 @@ export default async function PostPage({ params }: Props) {
           />
         )}
 
+        {/* 본문 앞: "지금 몇 편을 읽고 있는지" 를 먼저 알려준다. */}
+        {post.series && (
+          <div className="mt-10">
+            <SeriesNav series={post.series} />
+          </div>
+        )}
+
         <div className="py-12">
           <Markdown>{post.content_md}</Markdown>
         </div>
+
+        {/* 본문 뒤: 다 읽은 사람에게 다음 편으로 가는 길. */}
+        {post.series && <SeriesNav series={post.series} />}
 
         <PostActions
           postId={post.id}
