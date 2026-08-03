@@ -90,6 +90,18 @@ class ApiClient {
     return response.data
   }
 
+  /**
+   * 멀티파트 업로드.
+   * Content-Type 을 직접 지정하면 boundary 가 빠져 서버가 파싱하지 못한다.
+   * 브라우저가 채우도록 undefined 로 지운다.
+   */
+  async postForm<T>(url: string, form: FormData): Promise<T> {
+    const response = await this.client.post<T>(url, form, {
+      headers: { 'Content-Type': undefined },
+    })
+    return response.data
+  }
+
   /** 인증 헤더를 포함해 바이너리를 내려받는다. */
   async getBlob(url: string): Promise<Blob> {
     const response = await this.client.get<Blob>(url, { responseType: 'blob' })
