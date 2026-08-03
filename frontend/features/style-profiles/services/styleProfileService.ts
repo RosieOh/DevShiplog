@@ -3,14 +3,15 @@ import { apiClient } from '@/lib/api/client'
 export interface CreateStyleProfileRequest {
   blog_url: string
   sample_count: number
-  user_id: string
 }
 
 export interface StyleProfileResponse {
   id: string
-  status: string
+  status: 'queued' | 'running' | 'succeeded' | 'failed'
   blog_url: string
   sample_count: number
+  profile_json: Record<string, unknown> | null
+  error_text: string | null
 }
 
 export const styleProfileService = {
@@ -21,5 +22,8 @@ export const styleProfileService = {
   get: async (profileId: string): Promise<StyleProfileResponse> => {
     return apiClient.get(`/api/v1/style-profiles/${profileId}`)
   },
-}
 
+  list: async (): Promise<StyleProfileResponse[]> => {
+    return apiClient.get('/api/v1/style-profiles')
+  },
+}
