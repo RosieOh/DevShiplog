@@ -14,6 +14,7 @@ import {
 import { apiClient } from '@/lib/api/client'
 import { useToastStore } from '@/store/toastStore'
 import Link from 'next/link'
+import { CheckCircleIcon } from '@/components/ui/icons'
 
 export default function NewDraftPage() {
   const router = useRouter()
@@ -206,20 +207,20 @@ export default function NewDraftPage() {
   }, [jobStatus?.status, draftId, draft, loadDraft])
 
   return (
-    <div className="bg-[#f9f9f7] min-h-screen">
+    <div className="bg-canvas min-h-screen">
       <div className="max-w-[1400px] mx-auto px-[5%] py-12">
         <div className="mb-8">
-          <Link href="/dashboard" className="text-[#666666] hover:text-[#111111] mb-4 inline-block transition-colors">
+          <Link href="/dashboard" className="text-ink-muted hover:text-ink mb-4 inline-block transition-colors">
             ← Dashboard로 돌아가기
           </Link>
-          <h1 className="text-5xl font-bold text-[#111111] tracking-tight">새 글 만들기</h1>
+          <h1 className="text-5xl font-bold text-ink tracking-tight">새 글 만들기</h1>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8">
           {/* 좌측: 입력 & 옵션 */}
           <div className="space-y-6">
-            <div className="bg-white rounded-[32px] border border-black/5 p-8">
-              <h2 className="text-2xl font-bold mb-6 text-[#111111]">소스 입력</h2>
+            <div className="bg-surface rounded-[32px] border border-black/5 p-8">
+              <h2 className="text-2xl font-bold mb-6 text-ink">소스 입력</h2>
               
               <div className="mb-6">
                 <div className="flex gap-2 mb-6">
@@ -227,8 +228,8 @@ export default function NewDraftPage() {
                     onClick={() => setSourceType('url')}
                     className={`flex-1 px-4 py-3 rounded-full font-semibold transition-colors ${
                       sourceType === 'url' 
-                        ? 'bg-[#d1fb52] text-black' 
-                        : 'bg-gray-100 text-[#666666] hover:bg-gray-200'
+                        ? 'bg-accent text-ink' 
+                        : 'bg-gray-100 text-ink-muted hover:bg-gray-200'
                     }`}
                   >
                     URL
@@ -237,8 +238,8 @@ export default function NewDraftPage() {
                     onClick={() => setSourceType('text')}
                     className={`flex-1 px-4 py-3 rounded-full font-semibold transition-colors ${
                       sourceType === 'text' 
-                        ? 'bg-[#d1fb52] text-black' 
-                        : 'bg-gray-100 text-[#666666] hover:bg-gray-200'
+                        ? 'bg-accent text-ink' 
+                        : 'bg-gray-100 text-ink-muted hover:bg-gray-200'
                     }`}
                   >
                     텍스트/로그
@@ -250,16 +251,20 @@ export default function NewDraftPage() {
                     {urls.map((url, index) => (
                       <div key={index} className="flex gap-2">
                         <input
-                          type="text"
+                          type="url"
+                          inputMode="url"
+                          aria-label={`소스 URL ${index + 1}`}
                           value={url}
                           onChange={(e) => handleUrlChange(index, e.target.value)}
                           placeholder="https://..."
-                          className="flex-1 p-4 border border-black/10 rounded-2xl focus:ring-2 focus:ring-[#d1fb52] focus:border-transparent bg-[#f9f9f7]"
+                          className="flex-1 p-4 border border-black/10 rounded-2xl bg-canvas"
                         />
                         {urls.length > 1 && (
                           <button
+                            type="button"
                             onClick={() => handleRemoveUrl(index)}
-                            className="px-4 text-red-600 hover:bg-red-50 rounded-2xl transition-colors"
+                            aria-label={`소스 URL ${index + 1} 삭제`}
+                            className="px-4 min-h-touch text-red-700 hover:bg-red-50 rounded-2xl transition-colors"
                           >
                             삭제
                           </button>
@@ -268,48 +273,52 @@ export default function NewDraftPage() {
                     ))}
                     <button
                       onClick={handleAddUrl}
-                      className="text-[#666666] hover:text-[#111111] text-sm font-semibold transition-colors"
+                      className="text-ink-muted hover:text-ink text-sm font-semibold transition-colors"
                     >
                       + URL 추가
                     </button>
                   </div>
                 ) : (
                   <textarea
+                    id="raw-text"
+                    aria-label="붙여넣을 텍스트 또는 로그"
                     value={text}
                     onChange={(e) => setText(e.target.value)}
                     placeholder="텍스트 또는 로그를 입력하세요..."
-                    className="w-full p-4 border border-black/10 rounded-2xl h-40 focus:ring-2 focus:ring-[#d1fb52] focus:border-transparent bg-[#f9f9f7] resize-none"
+                    className="w-full p-4 border border-black/10 rounded-2xl h-40 bg-canvas resize-none font-mono text-sm"
                   />
                 )}
 
                 <button
                   onClick={handleExtractSources}
                   disabled={extracting}
-                  className="w-full mt-6 px-6 py-4 bg-[#d1fb52] text-black rounded-full hover:scale-105 transition-transform font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  className="w-full mt-6 px-6 py-4 bg-accent text-ink rounded-full motion-safe:hover:scale-105 transition-transform font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
                   {extracting ? '추출 중...' : '소스 추출'}
                 </button>
               </div>
 
               {sourceIds.length > 0 && (
-                <div className="p-4 bg-[#d1fb52]/20 border border-[#d1fb52]/30 rounded-2xl">
-                  <p className="text-black font-semibold">
-                    ✓ {sourceIds.length}개의 소스가 준비되었습니다.
+                <div className="p-4 bg-accent/20 border border-accent/30 rounded-2xl">
+                  <p className="flex items-center gap-2 text-ink font-semibold">
+                    <CheckCircleIcon className="w-5 h-5" />
+                    {sourceIds.length}개의 소스가 준비되었습니다.
                   </p>
                 </div>
               )}
             </div>
 
-            <div className="bg-white rounded-[32px] border border-black/5 p-8">
-              <h2 className="text-2xl font-bold mb-6 text-[#111111]">생성 옵션</h2>
+            <div className="bg-surface rounded-[32px] border border-black/5 p-8">
+              <h2 className="text-2xl font-bold mb-6 text-ink">생성 옵션</h2>
               
               <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-semibold text-[#111111] mb-3">생성 타입</label>
+                  <label htmlFor="draft-type" className="block text-sm font-semibold text-ink mb-3">생성 타입</label>
                   <select
+                    id="draft-type"
                     value={draftType}
                     onChange={(e) => setDraftType(e.target.value)}
-                    className="w-full p-4 border border-black/10 rounded-2xl focus:ring-2 focus:ring-[#d1fb52] bg-[#f9f9f7]"
+                    className="w-full p-4 border border-black/10 rounded-2xl bg-canvas"
                   >
                     <option value="troubleshooting">트러블슈팅</option>
                     <option value="implementation">구현기</option>
@@ -320,11 +329,12 @@ export default function NewDraftPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-[#111111] mb-3">대상 독자</label>
+                  <label htmlFor="draft-audience" className="block text-sm font-semibold text-ink mb-3">대상 독자</label>
                   <select
+                    id="draft-audience"
                     value={audience}
                     onChange={(e) => setAudience(e.target.value)}
-                    className="w-full p-4 border border-black/10 rounded-2xl focus:ring-2 focus:ring-[#d1fb52] bg-[#f9f9f7]"
+                    className="w-full p-4 border border-black/10 rounded-2xl bg-canvas"
                   >
                     <option value="junior">주니어</option>
                     <option value="intermediate">중급</option>
@@ -334,11 +344,12 @@ export default function NewDraftPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-[#111111] mb-3">길이</label>
+                  <label htmlFor="draft-length" className="block text-sm font-semibold text-ink mb-3">길이</label>
                   <select
+                    id="draft-length"
                     value={length}
                     onChange={(e) => setLength(e.target.value)}
-                    className="w-full p-4 border border-black/10 rounded-2xl focus:ring-2 focus:ring-[#d1fb52] bg-[#f9f9f7]"
+                    className="w-full p-4 border border-black/10 rounded-2xl bg-canvas"
                   >
                     <option value="short">짧게 (800자)</option>
                     <option value="default">기본 (1500~2500자)</option>
@@ -352,16 +363,16 @@ export default function NewDraftPage() {
                       type="checkbox"
                       checked={useStyleProfile}
                       onChange={(e) => setUseStyleProfile(e.target.checked)}
-                      className="w-5 h-5 text-[#d1fb52] rounded focus:ring-[#d1fb52]"
+                      className="w-5 h-5 rounded accent-accent-ink"
                     />
-                    <span className="font-semibold text-[#111111]">내 Style DNA 사용</span>
+                    <span className="font-semibold text-ink">내 Style DNA 사용</span>
                   </label>
                   {useStyleProfile &&
                     (styleProfiles.length > 0 ? (
                       <select
                         value={styleProfileId}
                         onChange={(e) => setStyleProfileId(e.target.value)}
-                        className="w-full mt-4 p-4 border border-black/10 rounded-2xl focus:ring-2 focus:ring-[#d1fb52] bg-[#f9f9f7]"
+                        className="w-full mt-4 p-4 border border-black/10 rounded-2xl bg-canvas"
                       >
                         <option value="">스타일 없이 생성</option>
                         {styleProfiles.map((profile) => (
@@ -371,9 +382,9 @@ export default function NewDraftPage() {
                         ))}
                       </select>
                     ) : (
-                      <p className="mt-4 text-sm text-[#666666]">
+                      <p className="mt-4 text-sm text-ink-muted">
                         아직 완성된 Style DNA가 없습니다.{' '}
-                        <Link href="/onboarding/style" className="underline hover:text-[#111111]">
+                        <Link href="/onboarding/style" className="underline hover:text-ink">
                           Style DNA 만들기 →
                         </Link>
                       </p>
@@ -385,7 +396,7 @@ export default function NewDraftPage() {
             <button
               onClick={handleGenerateDraft}
               disabled={loading || sourceIds.length === 0}
-              className="w-full px-8 py-5 bg-[#d1fb52] text-black rounded-full hover:scale-105 transition-transform font-semibold text-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="w-full px-8 py-5 bg-accent text-ink rounded-full motion-safe:hover:scale-105 transition-transform font-semibold text-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
               {loading ? '생성 중...' : '초안 생성하기'}
             </button>
@@ -400,28 +411,28 @@ export default function NewDraftPage() {
           {/* 우측: 결과 */}
           <div className="space-y-6">
             {jobStatus && (
-              <div className="bg-white rounded-[32px] border border-black/5 p-8">
-                <h2 className="text-2xl font-bold mb-6 text-[#111111]">생성 상태</h2>
+              <div className="bg-surface rounded-[32px] border border-black/5 p-8">
+                <h2 className="text-2xl font-bold mb-6 text-ink">생성 상태</h2>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-[#666666]">상태</span>
+                    <span className="text-ink-muted">상태</span>
                     <span className={`px-4 py-2 rounded-full text-sm font-semibold ${
-                      jobStatus.status === 'succeeded' ? 'bg-[#d1fb52] text-black' :
+                      jobStatus.status === 'succeeded' ? 'bg-accent text-ink' :
                       jobStatus.status === 'failed' ? 'bg-red-100 text-red-700' :
                       jobStatus.status === 'running' ? 'bg-blue-100 text-blue-700' :
-                      'bg-gray-100 text-[#666666]'
+                      'bg-gray-100 text-ink-muted'
                     }`}>
                       {jobStatus.status}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-[#666666]">진행률</span>
-                    <span className="font-semibold text-[#111111]">{jobStatus.progress}%</span>
+                    <span className="text-ink-muted">진행률</span>
+                    <span className="font-semibold text-ink">{jobStatus.progress}%</span>
                   </div>
                   {jobStatus.status === 'running' && (
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
-                        className="bg-[#d1fb52] h-2 rounded-full transition-all"
+                        className="bg-accent h-2 rounded-full transition-all"
                         style={{ width: `${jobStatus.progress}%` }}
                       ></div>
                     </div>
@@ -436,19 +447,19 @@ export default function NewDraftPage() {
             )}
 
             {(streamingContent || draft?.latest_version) && (
-              <div className="bg-white rounded-[32px] border border-black/5 p-8">
-                <h2 className="text-2xl font-bold mb-6 text-[#111111]">
+              <div className="bg-surface rounded-[32px] border border-black/5 p-8">
+                <h2 className="text-2xl font-bold mb-6 text-ink">
                   {streamingContent ? '생성 중...' : '생성된 초안'}
                 </h2>
-                <div className="p-6 bg-[#f9f9f7] rounded-2xl border border-black/5 max-h-96 overflow-y-auto">
-                  <pre className="whitespace-pre-wrap text-sm text-[#111111] font-mono">
+                <div className="p-6 bg-canvas rounded-2xl border border-black/5 max-h-96 overflow-y-auto">
+                  <pre className="whitespace-pre-wrap text-sm text-ink font-mono">
                     {streamingContent || draft?.latest_version?.content_md || ''}
                   </pre>
                 </div>
                 {draftId && !streamingContent && (
                   <Link
                     href={`/drafts/${draftId}/edit`}
-                    className="mt-6 block w-full text-center px-6 py-4 bg-[#d1fb52] text-black rounded-full hover:scale-105 transition-transform font-semibold"
+                    className="mt-6 block w-full text-center px-6 py-4 bg-accent text-ink rounded-full motion-safe:hover:scale-105 transition-transform font-semibold"
                   >
                     에디터에서 열기 →
                   </Link>
