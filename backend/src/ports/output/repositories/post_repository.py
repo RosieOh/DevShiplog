@@ -109,6 +109,13 @@ class PostRepository(ABC):
         ...
 
     @abstractmethod
+    def record_view(
+        self, post_id: str, viewer_key: str, user_id: Optional[str] = None, window_hours: int = 24
+    ) -> bool:
+        """조회를 기록하고, 이번이 새 조회면 True. 새 조회일 때만 조회수가 오른다."""
+        raise NotImplementedError
+
+    @abstractmethod
     def increment_view(self, post_id: str) -> None:
         ...
 
