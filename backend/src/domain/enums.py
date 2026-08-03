@@ -74,3 +74,44 @@ class SafetyAction(str, enum.Enum):
     MASK = "mask"
     DELETE = "delete"
     IGNORE = "ignore"
+
+
+class PostStatus(str, enum.Enum):
+    """공개 발행물의 상태.
+
+    Draft(비공개 작업본)와 Post(공개 스냅샷)는 별개다.
+    자동저장이 공개된 글을 실시간으로 바꾸면 안 되기 때문이다.
+    """
+
+    PUBLISHED = "published"
+    # 작성자가 다시 내림 (URL 은 남기고 404 처리)
+    UNLISTED = "unlisted"
+    # 운영자가 가림 (신고 처리 결과)
+    HIDDEN = "hidden"
+
+
+class NotificationType(str, enum.Enum):
+    COMMENT = "comment"
+    REPLY = "reply"
+    LIKE = "like"
+    FOLLOW = "follow"
+
+
+class ReportTargetType(str, enum.Enum):
+    POST = "post"
+    COMMENT = "comment"
+    USER = "user"
+
+
+class ReportReason(str, enum.Enum):
+    SPAM = "spam"
+    ABUSE = "abuse"
+    SENSITIVE = "sensitive"
+    COPYRIGHT = "copyright"
+    OTHER = "other"
+
+
+class ReportStatus(str, enum.Enum):
+    OPEN = "open"
+    RESOLVED = "resolved"
+    REJECTED = "rejected"
