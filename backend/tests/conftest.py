@@ -39,6 +39,20 @@ def db_session():
         engine.dispose()
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """레이트리밋 카운터는 프로세스 전역이다.
+
+    테스트끼리 IP 가 같아서(testclient) 앞 테스트가 쓴 횟수가 다음 테스트로 넘어간다.
+    비우지 않으면 실패가 실행 순서에 따라 달라진다.
+    """
+    from src.infrastructure.ratelimit.limiter import rate_limiter
+
+    rate_limiter.reset()
+    yield
+    rate_limiter.reset()
+
+
 @pytest.fixture()
 def client(db_session):
     app.dependency_overrides[get_db] = lambda: db_session
