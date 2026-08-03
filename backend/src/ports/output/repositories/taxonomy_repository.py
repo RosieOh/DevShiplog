@@ -57,3 +57,15 @@ class SeriesRepository(ABC):
     @abstractmethod
     def remove_post(self, series_id: str, post_id: str) -> None:
         ...
+
+    @abstractmethod
+    def context_for_post(self, post_id: str) -> Optional[dict]:
+        """이 글이 속한 시리즈와 앞뒤 글. 시리즈에 없으면 None."""
+
+    @abstractmethod
+    def reorder(self, series_id: str, post_ids: List[str]) -> None:
+        """주어진 순서대로 position 을 다시 매긴다. 빠진 글은 뒤로 밀린다."""
+
+    @abstractmethod
+    def delete(self, series_id: str) -> None:
+        """시리즈만 지운다. 안에 있던 글은 남는다."""
