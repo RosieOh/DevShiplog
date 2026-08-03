@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { profileService, MyProfile } from '@/features/profile/services/profileService'
 import { useToastStore } from '@/store/toastStore'
+import Avatar from '@/components/ui/Avatar'
+import ImageUploader from '@/components/ui/ImageUploader'
 
 const HANDLE_DEBOUNCE_MS = 400
 
@@ -109,6 +111,23 @@ export default function SettingsPage() {
         )}
 
         <div className="mt-8 space-y-8 rounded-lg border border-border-subtle bg-surface p-8">
+          <div>
+            <span className="block text-sm font-semibold text-ink">프로필 사진</span>
+            <div className="mt-3 flex items-center gap-4">
+              <Avatar
+                handle={profile?.handle ?? 'me'}
+                displayName={displayName || profile?.display_name}
+                src={profile?.avatar_url}
+                size={72}
+              />
+              <ImageUploader
+                endpoint="/api/v1/uploads/avatar"
+                label="사진 올리기"
+                onUploaded={(url) => setProfile((prev) => (prev ? { ...prev, avatar_url: url } : prev))}
+              />
+            </div>
+          </div>
+
           <div>
             <label htmlFor="handle" className="block text-sm font-semibold text-ink">
               블로그 아이디
