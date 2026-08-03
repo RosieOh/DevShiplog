@@ -1,43 +1,14 @@
-"""로컬 디스크 업로드 저장소.
+"""로컬 디스크 저장소.
 
-보안상 중요한 두 가지:
-1) 확장자와 Content-Type 은 클라이언트가 마음대로 보낸다. 실제 바이트의 매직 넘버로
-   판별해야 한다. 안 그러면 image/png 라고 주장하는 HTML 을 올려 저장형 XSS 가 된다.
-2) 파일명은 절대 그대로 쓰지 않는다. `../../etc/passwd` 같은 경로 탈출을 막기 위해
-   무작위 이름을 새로 만든다.
+개발과 단일 인스턴스 배포용이다. 서버를 2대 이상 띄우면 A 에 올린 파일을 B 가 못 찾고,
+컨테이너를 재배포하면 사라진다. 운영에서는 STORAGE_BACKEND=s3 를 쓴다.
 """
 
-import secrets
 from pathlib import Path
 from typing import Optional
 
 from src.infrastructure.config.settings import settings
-from src.ports.output.services.storage_service import StoredFile, StorageService
-
-# 매직 넘버 → (확장자, 정규화된 MIME)
-_SIGNATURES = [
-    (b"\x89PNG\r\n\x1a\n", "png", "image/png"),
-    (b"\xff\xd8\xff", "jpg", "image/jpeg"),
-    (b"GIF87a", "gif", "image/gif"),
-    (b"GIF89a", "gif", "image/gif"),
-]
-
-
-class UnsupportedFileError(ValueError):
-    """허용하지 않는 파일 형식"""
-
-
-def sniff_image(data: bytes) -> tuple[str, str]:
-    """바이트를 보고 이미지 형식을 판별한다. 아니면 예외."""
-    for signature, ext, mime in _SIGNATURES:
-        if data.startswith(signature):
-            return ext, mime
-
-    # WebP: "RIFF....WEBP"
-    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
-        return "webp", "image/webp"
-
-    raise UnsupportedFileError("PNG, JPEG, GIF, WebP 이미지만 올릴 수 있습니다.")
+from src.ports.output.services.storage_service import StorageService
 
 
 class LocalStorageService(StorageService):
@@ -46,37 +17,33 @@ class LocalStorageService(StorageService):
         self.root.mkdir(parents=True, exist_ok=True)
         self.public_prefix = (public_prefix or settings.UPLOAD_PUBLIC_PREFIX).rstrip("/")
 
-    def save(self, data: bytes, filename: str, content_type: str, prefix: str = "") -> StoredFile:
-        if not data:
-            raise UnsupportedFileError("빈 파일입니다.")
-        if len(data) > settings.MAX_UPLOAD_BYTES:
-            limit_mb = settings.MAX_UPLOAD_BYTES // (1024 * 1024)
-            raise UnsupportedFileError(f"파일이 너무 큽니다 (최대 {limit_mb}MB).")
+    def _path_for(self, key: str) -> Optional[Path]:
+        """key 를 실제 경로로. 루트를 벗어나면 None (경로 탈출 방어선)."""
+        target = (self.root / key).resolve()
+        try:
+            target.relative_to(self.root)
+        except ValueError:
+            return None
+        return target
 
-        # 클라이언트가 준 이름·타입은 신뢰하지 않는다.
-        ext, mime = sniff_image(data)
-
-        safe_prefix = "".join(c for c in prefix if c.isalnum() or c in "-_")
-        key = f"{safe_prefix + '/' if safe_prefix else ''}{secrets.token_urlsafe(16)}.{ext}"
-
-        destination = (self.root / key).resolve()
-        # 경로 탈출 최종 방어선
-        if not str(destination).startswith(str(self.root)):
-            raise UnsupportedFileError("잘못된 경로입니다.")
-
+    def put(self, key: str, data: bytes, content_type: str) -> str:
+        destination = self._path_for(key)
+        if destination is None:
+            raise ValueError("잘못된 저장 경로입니다.")
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(data)
-
-        return StoredFile(
-            url=f"{self.public_prefix}/{key}",
-            key=key,
-            size=len(data),
-            content_type=mime,
-        )
+        return self.url_for(key)
 
     def delete(self, key: str) -> bool:
-        target = (self.root / key).resolve()
-        if not str(target).startswith(str(self.root)) or not target.is_file():
+        target = self._path_for(key)
+        if target is None or not target.is_file():
             return False
         target.unlink()
         return True
+
+    def url_for(self, key: str) -> str:
+        return f"{self.public_prefix}/{key.lstrip('/')}"
+
+    def key_from_url(self, url: str) -> str:
+        prefix = f"{self.public_prefix}/"
+        return url[len(prefix):] if url.startswith(prefix) else ""
