@@ -70,6 +70,25 @@ export function CheckCircleIcon(props: IconProps) {
   )
 }
 
+export function HeartIcon({ className, filled }: IconProps & { filled?: boolean }) {
+  return (
+    <svg
+      className={`${base} ${className ?? 'w-5 h-5'}`}
+      viewBox="0 0 24 24"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M12 20.5S3.8 15.4 3.8 9.9A4.6 4.6 0 0 1 12 7.1a4.6 4.6 0 0 1 8.2 2.8c0 5.5-8.2 10.6-8.2 10.6Z" />
+    </svg>
+  )
+}
+
+
 export function CloseIcon(props: IconProps) {
   return (
     <Svg {...props}>
