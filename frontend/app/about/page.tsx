@@ -23,7 +23,7 @@ export default function Home() {
             <div className="pointer-events-auto">
               <Link
                 href="/drafts/new"
-                className="bg-accent px-8 py-4 rounded-full text-sm font-semibold text-ink inline-block motion-safe:hover:scale-105 transition-transform"
+                className="bg-accent px-8 py-4 rounded-full text-sm font-semibold text-ink inline-block transition-opacity hover:opacity-85"
               >
                 무료로 시작하기
               </Link>
@@ -33,7 +33,7 @@ export default function Home() {
       </section>
 
       {/* Stats Section */}
-      <section className="py-20 bg-canvas">
+      <section className="py-20 bg-bg">
         <div className="max-w-[1400px] mx-auto px-[5%]">
           <div className="grid md:grid-cols-4 gap-8">
             <div className="text-center">
@@ -65,7 +65,7 @@ export default function Home() {
 
         <div className="grid grid-cols-12 gap-5">
           {/* Large Item */}
-          <div className="col-span-12 md:col-span-8 bg-surface rounded-[32px] p-10 h-[500px] flex flex-col justify-between border border-black/5 motion-safe:hover:-translate-y-2.5 transition-transform">
+          <div className="col-span-12 md:col-span-8 bg-surface rounded-lg p-10 h-[500px] flex flex-col justify-between border border-border-subtle  transition-transform">
             <div>
               <h3 className="text-2xl font-bold mb-3 text-ink">AI 기반 초안 생성</h3>
               <p className="text-ink-muted text-base mb-4">
@@ -73,36 +73,36 @@ export default function Home() {
               </p>
               <ul className="space-y-2 text-ink-muted text-sm">
                 <li className="flex items-start">
-                  <span className="text-accent-ink mr-2" aria-hidden="true">•</span>
+                  <span className="text-accent-text mr-2" aria-hidden="true">•</span>
                   <span>GitHub PR/Issue URL 자동 분석 및 요약</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="text-accent-ink mr-2" aria-hidden="true">•</span>
+                  <span className="text-accent-text mr-2" aria-hidden="true">•</span>
                   <span>에러 로그 및 디버깅 과정 자동 문서화</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="text-accent-ink mr-2" aria-hidden="true">•</span>
+                  <span className="text-accent-text mr-2" aria-hidden="true">•</span>
                   <span>스트리밍 방식으로 실시간 생성 확인</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="text-accent-ink mr-2" aria-hidden="true">•</span>
+                  <span className="text-accent-text mr-2" aria-hidden="true">•</span>
                   <span>목차, 제목 후보, 키포인트 자동 추출</span>
                 </li>
               </ul>
             </div>
-            <div className="w-full h-40 bg-gradient-to-br from-blue-50 to-purple-50 rounded-[20px] mt-5 flex items-center justify-center">
+            <div className="w-full h-40 bg-surface-2 rounded mt-5 flex items-center justify-center">
               <div className="text-6xl">✨</div>
             </div>
           </div>
 
           {/* Small Item - Dark */}
-          <div className="col-span-12 md:col-span-4 bg-surface-dark rounded-[32px] p-10 h-[500px] flex flex-col justify-between text-canvas motion-safe:hover:-translate-y-2.5 transition-transform">
+          <div className="col-span-12 md:col-span-4 bg-ink rounded-lg p-10 h-[500px] flex flex-col justify-between text-bg  transition-transform">
             <div>
-              <h3 className="text-2xl font-bold mb-3 text-canvas">Style DNA</h3>
-              <p className="text-canvas/70 text-base mb-4">
+              <h3 className="text-2xl font-bold mb-3 text-bg">Style DNA</h3>
+              <p className="text-bg/70 text-base mb-4">
                 내 블로그 스타일을 학습하여 모든 글에서 일관된 톤과 문체를 유지합니다.
               </p>
-              <ul className="space-y-2 text-canvas/70 text-sm">
+              <ul className="space-y-2 text-bg/70 text-sm">
                 <li className="flex items-start">
                   <span className="text-accent mr-2" aria-hidden="true">•</span>
                   <span>블로그 주소로 자동 스타일 분석</span>
@@ -117,13 +117,13 @@ export default function Home() {
                 </li>
               </ul>
             </div>
-            <div className="w-full h-36 bg-canvas/10 rounded-[20px] mt-5 flex items-center justify-center">
+            <div className="w-full h-36 bg-bg/10 rounded-[20px] mt-5 flex items-center justify-center">
               <div className="text-4xl">🎨</div>
             </div>
           </div>
 
           {/* Medium Items */}
-          <div className="col-span-12 md:col-span-6 bg-surface rounded-[32px] p-10 h-[400px] flex flex-col justify-between border border-black/5 motion-safe:hover:-translate-y-2.5 transition-transform">
+          <div className="col-span-12 md:col-span-6 bg-surface rounded-lg p-10 h-[400px] flex flex-col justify-between border border-border-subtle  transition-transform">
             <div>
               <h3 className="text-2xl font-bold mb-3 text-ink">Safety 검사</h3>
               <p className="text-ink-muted text-base mb-4">
@@ -131,26 +131,26 @@ export default function Home() {
               </p>
               <ul className="space-y-2 text-ink-muted text-sm">
                 <li className="flex items-start">
-                  <span className="text-accent-ink mr-2" aria-hidden="true">•</span>
+                  <span className="text-accent-text mr-2" aria-hidden="true">•</span>
                   <span>API 키, JWT, Bearer 토큰 자동 탐지</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="text-accent-ink mr-2" aria-hidden="true">•</span>
+                  <span className="text-accent-text mr-2" aria-hidden="true">•</span>
                   <span>이메일, 전화번호, 내부 URL 마스킹</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="text-accent-ink mr-2" aria-hidden="true">•</span>
+                  <span className="text-accent-text mr-2" aria-hidden="true">•</span>
                   <span>회사명 및 민감 정보 자동 필터링</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="text-accent-ink mr-2" aria-hidden="true">•</span>
+                  <span className="text-accent-text mr-2" aria-hidden="true">•</span>
                   <span>발행 전 필수 체크 리스트 제공</span>
                 </li>
               </ul>
             </div>
           </div>
 
-          <div className="col-span-12 md:col-span-6 bg-surface rounded-[32px] p-10 h-[400px] flex flex-col justify-between border border-black/5 motion-safe:hover:-translate-y-2.5 transition-transform">
+          <div className="col-span-12 md:col-span-6 bg-surface rounded-lg p-10 h-[400px] flex flex-col justify-between border border-border-subtle  transition-transform">
             <div>
               <h3 className="text-2xl font-bold mb-3 text-ink">원스톱 워크플로우</h3>
               <p className="text-ink-muted text-base mb-4">
@@ -158,19 +158,19 @@ export default function Home() {
               </p>
               <ul className="space-y-2 text-ink-muted text-sm">
                 <li className="flex items-start">
-                  <span className="text-accent-ink mr-2" aria-hidden="true">•</span>
+                  <span className="text-accent-text mr-2" aria-hidden="true">•</span>
                   <span>소스 추출 및 본문 자동 정리</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="text-accent-ink mr-2" aria-hidden="true">•</span>
+                  <span className="text-accent-text mr-2" aria-hidden="true">•</span>
                   <span>마크다운 에디터 + 실시간 프리뷰</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="text-accent-ink mr-2" aria-hidden="true">•</span>
+                  <span className="text-accent-text mr-2" aria-hidden="true">•</span>
                   <span>버전 관리 및 히스토리 추적</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="text-accent-ink mr-2" aria-hidden="true">•</span>
+                  <span className="text-accent-text mr-2" aria-hidden="true">•</span>
                   <span>Copy & Download 즉시 지원</span>
                 </li>
               </ul>
@@ -188,8 +188,8 @@ export default function Home() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-12">
-            <div className="bg-canvas p-10 rounded-[32px] border border-black/5">
-              <div className="w-16 h-16 bg-accent rounded-2xl flex items-center justify-center mb-6">
+            <div className="bg-bg p-10 rounded-lg border border-border-subtle">
+              <div className="w-16 h-16 bg-accent rounded flex items-center justify-center mb-6">
                 <svg className="w-8 h-8 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
@@ -200,8 +200,8 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-canvas p-10 rounded-[32px] border border-black/5">
-              <div className="w-16 h-16 bg-accent rounded-2xl flex items-center justify-center mb-6">
+            <div className="bg-bg p-10 rounded-lg border border-border-subtle">
+              <div className="w-16 h-16 bg-accent rounded flex items-center justify-center mb-6">
                 <svg className="w-8 h-8 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
                 </svg>
@@ -212,8 +212,8 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-canvas p-10 rounded-[32px] border border-black/5">
-              <div className="w-16 h-16 bg-accent rounded-2xl flex items-center justify-center mb-6">
+            <div className="bg-bg p-10 rounded-lg border border-border-subtle">
+              <div className="w-16 h-16 bg-accent rounded flex items-center justify-center mb-6">
                 <svg className="w-8 h-8 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
@@ -228,7 +228,7 @@ export default function Home() {
       </section>
 
       {/* How It Works Section */}
-      <section className="py-24 bg-canvas">
+      <section className="py-24 bg-bg">
         <div className="max-w-[1400px] mx-auto px-[5%]">
           <div className="text-center mb-20">
             <h2 className="text-4xl md:text-5xl font-bold text-ink mb-4 tracking-tight">작동 방식</h2>
@@ -238,7 +238,7 @@ export default function Home() {
           <div className="max-w-5xl mx-auto">
             <div className="grid md:grid-cols-3 gap-8 mb-16">
               <div className="text-center">
-                <div className="w-20 h-20 bg-accent text-ink rounded-full flex items-center justify-center text-3xl font-bold mx-auto mb-6">
+                <div className="w-20 h-20 bg-ink text-bg rounded-full flex items-center justify-center text-3xl font-bold mx-auto mb-6">
                   01
                 </div>
                 <h4 className="text-xl font-bold mb-3 text-ink">소스 입력</h4>
@@ -249,7 +249,7 @@ export default function Home() {
               </div>
 
               <div className="text-center">
-                <div className="w-20 h-20 bg-accent text-ink rounded-full flex items-center justify-center text-3xl font-bold mx-auto mb-6">
+                <div className="w-20 h-20 bg-ink text-bg rounded-full flex items-center justify-center text-3xl font-bold mx-auto mb-6">
                   02
                 </div>
                 <h4 className="text-xl font-bold mb-3 text-ink">초안 생성</h4>
@@ -260,7 +260,7 @@ export default function Home() {
               </div>
 
               <div className="text-center">
-                <div className="w-20 h-20 bg-accent text-ink rounded-full flex items-center justify-center text-3xl font-bold mx-auto mb-6">
+                <div className="w-20 h-20 bg-ink text-bg rounded-full flex items-center justify-center text-3xl font-bold mx-auto mb-6">
                   03
                 </div>
                 <h4 className="text-xl font-bold mb-3 text-ink">검수 및 발행</h4>
@@ -282,21 +282,21 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-12 gap-5">
-          <div className="col-span-12 md:col-span-4 bg-canvas rounded-[32px] p-10 border border-black/5 motion-safe:hover:-translate-y-2.5 transition-transform">
+          <div className="col-span-12 md:col-span-4 bg-bg rounded-lg p-10 border border-border-subtle  transition-transform">
             <h3 className="text-2xl font-bold mb-3 text-ink">실시간 생성</h3>
             <p className="text-ink-muted text-base">
               스트리밍 방식으로 초안을 실시간으로 확인하며 생성 과정을 볼 수 있습니다.
             </p>
           </div>
 
-          <div className="col-span-12 md:col-span-4 bg-canvas rounded-[32px] p-10 border border-black/5 motion-safe:hover:-translate-y-2.5 transition-transform">
+          <div className="col-span-12 md:col-span-4 bg-bg rounded-lg p-10 border border-border-subtle  transition-transform">
             <h3 className="text-2xl font-bold mb-3 text-ink">버전 관리</h3>
             <p className="text-ink-muted text-base">
               생성된 초안의 모든 버전을 관리하고 이전 버전과 비교할 수 있습니다.
             </p>
           </div>
 
-          <div className="col-span-12 md:col-span-4 bg-canvas rounded-[32px] p-10 border border-black/5 motion-safe:hover:-translate-y-2.5 transition-transform">
+          <div className="col-span-12 md:col-span-4 bg-bg rounded-lg p-10 border border-border-subtle  transition-transform">
             <h3 className="text-2xl font-bold mb-3 text-ink">변형 기능</h3>
             <p className="text-ink-muted text-base">
               더 짧게, 더 길게, 쉽게, 더 딥하게 등 원하는 방향으로 초안을 변형할 수 있습니다.
@@ -314,7 +314,7 @@ export default function Home() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-8">
-            <div className="bg-canvas p-10 rounded-[32px] border border-black/5">
+            <div className="bg-bg p-10 rounded-lg border border-border-subtle">
               <h3 className="text-2xl font-bold mb-4 text-ink">PR 리뷰 후기 작성</h3>
               <p className="text-ink-muted text-lg leading-relaxed mb-4">
                 GitHub PR을 URL로 입력하면, 코드 리뷰 과정과 배운 점을 정리한 기술 글 초안이 자동으로 생성됩니다.
@@ -326,7 +326,7 @@ export default function Home() {
               </ul>
             </div>
 
-            <div className="bg-canvas p-10 rounded-[32px] border border-black/5">
+            <div className="bg-bg p-10 rounded-lg border border-border-subtle">
               <h3 className="text-2xl font-bold mb-4 text-ink">트러블슈팅 문서화</h3>
               <p className="text-ink-muted text-lg leading-relaxed mb-4">
                 에러 로그나 디버깅 과정을 텍스트로 입력하면, 문제-원인-해결 과정을 정리한 글 초안이 생성됩니다.
@@ -338,7 +338,7 @@ export default function Home() {
               </ul>
             </div>
 
-            <div className="bg-canvas p-10 rounded-[32px] border border-black/5">
+            <div className="bg-bg p-10 rounded-lg border border-border-subtle">
               <h3 className="text-2xl font-bold mb-4 text-ink">기술 스택 도입기</h3>
               <p className="text-ink-muted text-lg leading-relaxed mb-4">
                 새로운 기술을 도입한 과정과 결과를 정리한 글을 빠르게 작성할 수 있습니다.
@@ -350,7 +350,7 @@ export default function Home() {
               </ul>
             </div>
 
-            <div className="bg-canvas p-10 rounded-[32px] border border-black/5">
+            <div className="bg-bg p-10 rounded-lg border border-border-subtle">
               <h3 className="text-2xl font-bold mb-4 text-ink">릴리즈 노트 작성</h3>
               <p className="text-ink-muted text-lg leading-relaxed mb-4">
                 커밋 히스토리나 변경사항을 바탕으로 사용자 친화적인 릴리즈 노트를 생성합니다.
@@ -366,7 +366,7 @@ export default function Home() {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-24 bg-canvas">
+      <section className="py-24 bg-bg">
         <div className="max-w-[1400px] mx-auto px-[5%]">
           <div className="text-center mb-20">
             <h2 className="text-4xl md:text-5xl font-bold text-ink mb-4 tracking-tight">자주 묻는 질문</h2>
@@ -374,7 +374,7 @@ export default function Home() {
           </div>
 
           <div className="max-w-3xl mx-auto space-y-6">
-            <div className="bg-surface p-8 rounded-[32px] border border-black/5">
+            <div className="bg-surface p-8 rounded-lg border border-border-subtle">
               <h3 className="text-xl font-bold mb-3 text-ink">어떤 소스를 입력할 수 있나요?</h3>
               <p className="text-ink-muted leading-relaxed">
                 GitHub PR/Issue URL, 블로그 글 URL, 텍스트, 로그 파일 등 다양한 형태의 소스를 입력할 수 있습니다. 
@@ -382,7 +382,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-surface p-8 rounded-[32px] border border-black/5">
+            <div className="bg-surface p-8 rounded-lg border border-border-subtle">
               <h3 className="text-xl font-bold mb-3 text-ink">Style DNA는 어떻게 작동하나요?</h3>
               <p className="text-ink-muted leading-relaxed">
                 블로그 주소를 입력하면 최근 글들을 분석하여 톤, 종결어미, 구조 선호도 등을 추출합니다. 
@@ -390,7 +390,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-surface p-8 rounded-[32px] border border-black/5">
+            <div className="bg-surface p-8 rounded-lg border border-border-subtle">
               <h3 className="text-xl font-bold mb-3 text-ink">Safety 검사는 어떤 정보를 탐지하나요?</h3>
               <p className="text-ink-muted leading-relaxed">
                 API 키, 토큰, 이메일, 전화번호, 내부 URL, 회사명 등 민감정보를 자동으로 탐지합니다. 
@@ -398,7 +398,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-surface p-8 rounded-[32px] border border-black/5">
+            <div className="bg-surface p-8 rounded-lg border border-border-subtle">
               <h3 className="text-xl font-bold mb-3 text-ink">생성된 초안을 수정할 수 있나요?</h3>
               <p className="text-ink-muted leading-relaxed">
                 네, 마크다운 에디터에서 자유롭게 수정할 수 있습니다. 또한 &quot;더 짧게&quot;, &quot;더 길게&quot;, &quot;쉽게&quot;, 
@@ -406,7 +406,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-surface p-8 rounded-[32px] border border-black/5">
+            <div className="bg-surface p-8 rounded-lg border border-border-subtle">
               <h3 className="text-xl font-bold mb-3 text-ink">어떤 플랫폼에 발행할 수 있나요?</h3>
               <p className="text-ink-muted leading-relaxed">
                 현재는 마크다운 파일로 다운로드하거나 클립보드에 복사할 수 있습니다. 
@@ -429,13 +429,13 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/drafts/new"
-                className="px-10 py-5 bg-ink text-canvas rounded-full text-lg font-semibold motion-safe:hover:scale-105 transition-transform"
+                className="px-10 py-5 bg-ink text-bg rounded-full text-lg font-semibold transition-opacity hover:opacity-85"
               >
                 무료로 시작하기
               </Link>
               <Link
                 href="/onboarding/style"
-                className="px-10 py-5 bg-surface text-ink border-2 border-ink rounded-full text-lg font-semibold hover:bg-canvas transition-colors"
+                className="px-10 py-5 bg-surface text-ink border-2 border-ink rounded-full text-lg font-semibold hover:bg-bg transition-colors"
               >
                 Style DNA 설정
               </Link>
