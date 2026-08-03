@@ -33,6 +33,7 @@ class PublishPostUseCase:
         self.user_repo = user_repo
         self.scanner = SafetyScanner()
 
+
     def execute(
         self,
         user_id: str,
@@ -75,6 +76,7 @@ class PublishPostUseCase:
             )
 
         existing = self.post_repo.get_by_draft_id(draft_id)
+        orphan_cover: Optional[str] = None
         slug = unique_slug(
             title,
             self.post_repo.slugs_for_user(user_id),
@@ -83,6 +85,11 @@ class PublishPostUseCase:
         summary = summarize(content)
 
         if existing:
+            # 커버를 바꿨다면 이전 파일은 아무도 참조하지 않는다. 남기면 계속 쌓인다.
+            # 실제 삭제는 호출부가 캐시 무효화 뒤에 한다 (아래 orphan_cover 참고).
+            if existing.cover_url and existing.cover_url != cover_url:
+                orphan_cover = existing.cover_url
+
             # 재발행: 주소를 유지한다. 이미 걸린 외부 링크와 색인을 지키기 위해서다.
             post = self.post_repo.update_content(
                 post_id=existing.id,
@@ -120,6 +127,9 @@ class PublishPostUseCase:
             "tags": [t.display_name for t in saved_tags],
             "sensitive_findings": len(blocking),
             "cover_url": post.cover_url,
+            # 호출부가 캐시를 깬 뒤에 지워야 한다. 먼저 지우면 아직 옛 커버를 가리키는
+            # 캐시된 페이지가 깨진 이미지를 내보내는 구간이 생긴다.
+            "orphan_cover_url": orphan_cover,
         }
 
 
@@ -163,10 +173,12 @@ class DeletePostUseCase:
             raise NotFoundError("글을 찾을 수 없습니다.")
 
         was_published = post.status is PostStatus.PUBLISHED
+        cover_url = post.cover_url
         # 태그 카운터를 먼저 정리해야 고아 카운트가 남지 않는다.
         self.tag_repo.clear_for_post(post_id)
         self.post_repo.delete(post_id)
         if was_published:
             self.user_repo.adjust_post_count(user_id, -1)
 
-        return {"deleted": True}
+        # 파일 삭제는 호출부가 캐시 무효화 뒤에 한다.
+        return {"deleted": True, "orphan_cover_url": cover_url}
