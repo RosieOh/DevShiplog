@@ -1,8 +1,12 @@
 """좋아요 / 댓글 / 팔로우 / 알림 / 신고 (인증 필요)."""
 
+import asyncio
+import json
+import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from src.application.use_cases.moderation.report import ReportContentUseCase, ToggleBlockUseCase
@@ -18,6 +22,7 @@ from src.ports.input.api.v1.dependencies import (
     get_block_repo,
     get_comment_repo,
     get_current_user_id,
+    get_current_user_id_sse,
     get_follow_repo,
     get_like_repo,
     get_notification_repo,
@@ -25,6 +30,10 @@ from src.ports.input.api.v1.dependencies import (
     get_report_repo,
     get_user_repo,
 )
+from src.infrastructure.database.repositories.social_repository_impl import (
+    NotificationRepositoryImpl,
+)
+from src.infrastructure.database.session import SessionLocal
 from src.ports.output.repositories.moderation_repository import BlockRepository, ReportRepository
 from src.ports.output.repositories.post_repository import PostRepository
 from src.ports.output.repositories.social_repository import (
@@ -36,7 +45,19 @@ from src.ports.output.repositories.social_repository import (
 from src.infrastructure.external import revalidation
 from src.ports.output.repositories.user_repository import UserRepository
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
+
+# 알림 스트림. 폴링보다 촘촘하되 DB 를 때리는 간격은 넉넉히 둔다.
+NOTIFY_POLL_SECONDS = 3.0
+NOTIFY_HEARTBEAT_SECONDS = 20.0
+# 연결을 영원히 붙잡지 않는다. 끊기면 EventSource 가 알아서 다시 붙는다.
+NOTIFY_STREAM_MAX_SECONDS = 900.0
+
+
+def _sse(payload: Dict[str, Any]) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
 class CommentRequest(BaseModel):
@@ -205,6 +226,65 @@ def list_notifications(
             for n in items
         ],
     }
+
+
+@router.get("/notifications/stream")
+async def stream_notifications(
+    user_id: str = Depends(get_current_user_id_sse),
+):
+    """읽지 않은 알림 수를 밀어준다.
+
+    폴링을 대신한다. 알림은 대부분의 시간 동안 아무 일도 없는데, 그때도
+    30초마다 요청이 오면 접속자 수에 비례해 그냥 버려지는 쿼리가 쌓인다.
+
+    보내는 값은 개수뿐이다. 목록까지 스트림에 실으면 읽음 처리·페이지네이션과
+    상태가 갈라진다. 개수가 바뀌면 클라이언트가 목록을 다시 가져오면 된다.
+    """
+
+    async def event_generator():
+        db = SessionLocal()
+        try:
+            repo = NotificationRepositoryImpl(db)
+            last: Optional[int] = None
+            elapsed = 0.0
+            since_heartbeat = 0.0
+
+            while elapsed < NOTIFY_STREAM_MAX_SECONDS:
+                # MySQL 의 REPEATABLE READ 는 트랜잭션이 시작된 시점의 스냅샷을 계속 본다.
+                # 새로 시작하지 않으면 다른 세션이 넣은 알림이 영원히 안 보인다.
+                db.rollback()
+                count = repo.unread_count(user_id)
+                if count != last:
+                    last = count
+                    since_heartbeat = 0.0
+                    yield _sse({"type": "unread", "count": count})
+
+                await asyncio.sleep(NOTIFY_POLL_SECONDS)
+                elapsed += NOTIFY_POLL_SECONDS
+                since_heartbeat += NOTIFY_POLL_SECONDS
+
+                if since_heartbeat >= NOTIFY_HEARTBEAT_SECONDS:
+                    since_heartbeat = 0.0
+                    # 프록시가 유휴 연결을 끊지 않도록 주석 라인을 흘린다.
+                    yield ": keep-alive\n\n"
+
+            # 상한에 닿으면 그냥 끊는다. EventSource 가 알아서 다시 붙는다.
+        except asyncio.CancelledError:  # 클라이언트가 연결을 끊음
+            raise
+        except Exception:
+            logger.exception("알림 스트림 오류 (user=%s)", user_id)
+        finally:
+            db.close()
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # nginx 버퍼링 비활성화
+        },
+    )
 
 
 @router.post("/notifications/read")
