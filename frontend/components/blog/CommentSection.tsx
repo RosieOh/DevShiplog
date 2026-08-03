@@ -78,7 +78,7 @@ export default function CommentSection({ postId, handle, slug, comments, comment
   }
 
   const renderComment = (comment: CommentNode, isReply = false) => (
-    <li key={comment.id} className={isReply ? 'ml-6 border-l border-black/10 pl-5' : ''}>
+    <li key={comment.id} className={isReply ? 'ml-6 border-l border-border pl-5' : ''}>
       <div className="py-5">
         {comment.deleted ? (
           // 답글이 달린 댓글을 통째로 지우면 대화 흐름이 끊긴다. 자리를 남긴다.
@@ -113,7 +113,7 @@ export default function CommentSection({ postId, handle, slug, comments, comment
                 <button
                   type="button"
                   onClick={() => remove(comment.id)}
-                  className="text-ink-muted transition-colors hover:text-red-700"
+                  className="text-ink-muted transition-colors hover:text-danger"
                 >
                   삭제
                 </button>
@@ -134,7 +134,7 @@ export default function CommentSection({ postId, handle, slug, comments, comment
               maxLength={MAX_LEN}
               rows={3}
               placeholder="답글을 입력하세요"
-              className="w-full rounded-2xl border border-black/10 bg-canvas p-4 text-sm"
+              className="w-full rounded border border-border bg-bg p-4 text-sm"
             />
             <div className="mt-2 flex gap-2">
               <button
@@ -164,7 +164,7 @@ export default function CommentSection({ postId, handle, slug, comments, comment
   )
 
   return (
-    <section className="mt-12 border-t border-black/10 pt-10" aria-labelledby="comments-heading">
+    <section className="mt-12 border-t border-border pt-10" aria-labelledby="comments-heading">
       <h2 id="comments-heading" className="text-xl font-bold text-ink">
         댓글 {commentCount}
       </h2>
@@ -182,7 +182,7 @@ export default function CommentSection({ postId, handle, slug, comments, comment
           placeholder={
             status === 'authenticated' ? '댓글을 입력하세요' : '댓글을 쓰려면 로그인이 필요합니다'
           }
-          className="w-full rounded-2xl border border-black/10 bg-surface p-4"
+          className="w-full rounded border border-border bg-surface p-4"
         />
         <div className="mt-3 flex items-center justify-between">
           <span className="text-xs text-ink-muted">
@@ -192,7 +192,7 @@ export default function CommentSection({ postId, handle, slug, comments, comment
             type="button"
             onClick={() => submit(body)}
             disabled={busy}
-            className="inline-flex min-h-touch items-center rounded-full bg-accent px-6 font-semibold text-ink motion-safe:hover:scale-105 transition-transform disabled:opacity-60"
+            className="inline-flex min-h-touch items-center rounded bg-ink px-6 font-semibold text-bg transition-opacity hover:opacity-85 disabled:opacity-60"
           >
             댓글 등록
           </button>
@@ -200,7 +200,7 @@ export default function CommentSection({ postId, handle, slug, comments, comment
       </div>
 
       {comments.length > 0 ? (
-        <ul className="mt-8 divide-y divide-black/5">{comments.map((c) => renderComment(c))}</ul>
+        <ul className="mt-8 divide-y divide-border-subtle">{comments.map((c) => renderComment(c))}</ul>
       ) : (
         <p className="mt-10 text-center text-ink-muted">첫 댓글을 남겨보세요.</p>
       )}
