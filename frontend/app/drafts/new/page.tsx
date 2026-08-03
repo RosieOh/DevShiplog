@@ -1,12 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useDraftGeneration } from '@/features/drafts/hooks/useDraftGeneration'
 import { useJobStatus } from '@/features/drafts/hooks/useJobStatus'
 import { sourceService } from '@/features/sources/services/sourceService'
 import { draftService, Draft } from '@/features/drafts/services/draftService'
+import {
+  styleProfileService,
+  StyleProfileResponse,
+} from '@/features/style-profiles/services/styleProfileService'
+import { apiClient } from '@/lib/api/client'
 import { useToastStore } from '@/store/toastStore'
 import Link from 'next/link'
 
@@ -23,6 +28,7 @@ export default function NewDraftPage() {
   const [length, setLength] = useState('default')
   const [useStyleProfile, setUseStyleProfile] = useState(false)
   const [styleProfileId, setStyleProfileId] = useState('')
+  const [styleProfiles, setStyleProfiles] = useState<StyleProfileResponse[]>([])
   const [draft, setDraft] = useState<Draft | null>(null)
   const [extracting, setExtracting] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
@@ -35,6 +41,15 @@ export default function NewDraftPage() {
       router.push('/auth/login')
     }
   }, [status, router])
+
+  // 완성된 Style DNA 만 선택지로 보여준다.
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    styleProfileService
+      .list()
+      .then((profiles) => setStyleProfiles(profiles.filter((p) => p.status === 'succeeded')))
+      .catch(() => setStyleProfiles([]))
+  }, [status])
 
   const handleAddUrl = () => {
     setUrls([...urls, ''])
@@ -62,37 +77,41 @@ export default function NewDraftPage() {
 
     try {
       setExtracting(true)
-      
+
       let sources
       if (sourceType === 'url') {
-        const validUrls = urls.filter(u => u.trim())
+        const validUrls = urls.filter((u) => u.trim())
         if (validUrls.length === 0) {
-          addToast({
-            message: '최소 하나의 URL을 입력해주세요.',
-            type: 'error',
-          })
+          addToast({ message: '최소 하나의 URL을 입력해주세요.', type: 'error' })
           return
         }
-        sources = await sourceService.extractURLs({ urls: validUrls, user_id: session.user.id })
+        sources = await sourceService.extractURLs(validUrls)
       } else {
         if (!text.trim()) {
-          addToast({
-            message: '텍스트를 입력해주세요.',
-            type: 'error',
-          })
+          addToast({ message: '텍스트를 입력해주세요.', type: 'error' })
           return
         }
-        sources = await sourceService.extractText({ raw_text: text, user_id: session.user.id })
+        sources = await sourceService.extractText(text)
       }
-      
-      setSourceIds(sources.map(s => s.id))
-      addToast({
-        message: `${sources.length}개의 소스가 추출되었습니다.`,
-        type: 'success',
+
+      // 추출에 실패한 항목은 id 가 없다. 성공한 것만 사용하고 실패는 따로 알린다.
+      const succeeded = sources.filter((s): s is typeof s & { id: string } => Boolean(s.id))
+      const failed = sources.filter((s) => !s.id)
+
+      setSourceIds(succeeded.map((s) => s.id))
+
+      if (succeeded.length > 0) {
+        addToast({
+          message: `${succeeded.length}개의 소스가 추출되었습니다.`,
+          type: 'success',
+        })
+      }
+      failed.forEach((s) => {
+        addToast({ message: `추출 실패 (${s.title}): ${s.error ?? '알 수 없는 오류'}`, type: 'error' })
       })
-    } catch (err: any) {
+    } catch (err) {
       addToast({
-        message: `소스 추출 실패: ${err.message}`,
+        message: err instanceof Error ? err.message : '소스 추출에 실패했습니다.',
         type: 'error',
       })
     } finally {
@@ -101,85 +120,90 @@ export default function NewDraftPage() {
   }
 
   const handleGenerateDraft = async () => {
-    if (!session?.user?.id) {
-      addToast({
-        message: '로그인이 필요합니다.',
-        type: 'error',
-      })
-      return
-    }
-
     if (sourceIds.length === 0) {
-      addToast({
-        message: '먼저 소스를 추출해주세요.',
-        type: 'error',
-      })
+      addToast({ message: '먼저 소스를 추출해주세요.', type: 'error' })
       return
     }
 
     try {
       setStreamingContent('')
+      setDraft(null)
       await generateDraft({
         source_ids: sourceIds,
         type: draftType,
         audience,
         length,
         use_style_profile: useStyleProfile,
-        style_profile_id: styleProfileId || undefined,
-        user_id: session.user.id,
+        style_profile_id: useStyleProfile ? styleProfileId || undefined : undefined,
       })
-    } catch (err) {
-      // Error is handled in hook
+    } catch {
+      // 오류 메시지는 훅의 error 상태로 표시된다.
     }
   }
 
-  // 스트리밍 처리
-  useEffect(() => {
-    if (jobId && jobStatus?.status === 'running') {
-      const eventSource = new EventSource(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/jobs/${jobId}/stream`
-      )
-      
-      eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data)
-        if (data.type === 'chunk') {
-          setStreamingContent(prev => prev + data.content)
-        } else if (data.type === 'done') {
-          eventSource.close()
-          loadDraft()
-        }
-      }
-
-      eventSource.onerror = () => {
-        eventSource.close()
-      }
-
-      return () => {
-        eventSource.close()
-      }
-    }
-  }, [jobId, jobStatus?.status])
-
-  const loadDraft = async () => {
+  const loadDraft = useCallback(async () => {
     if (!draftId) return
-    
     try {
       const loadedDraft = await draftService.get(draftId)
       setDraft(loadedDraft)
       setStreamingContent('')
-    } catch (err: any) {
+    } catch (err) {
       addToast({
-        message: `Draft 로드 실패: ${err.message}`,
+        message: err instanceof Error ? err.message : 'Draft 를 불러오지 못했습니다.',
         type: 'error',
       })
     }
-  }
+  }, [draftId, addToast])
 
+  // 실시간 스트리밍. Job 생성 직후 바로 연결한다.
+  // (running 상태를 기다리면 짧은 작업에서 스트림을 통째로 놓칠 수 있다.)
+  useEffect(() => {
+    if (!jobId) return
+
+    let eventSource: EventSource | null = null
+    let closed = false
+
+    const connect = async () => {
+      // EventSource 는 헤더를 못 붙이므로 토큰을 쿼리로 넘긴다.
+      const source = await apiClient.createEventSource(`/api/v1/jobs/${jobId}/stream`)
+      if (closed) {
+        source.close()
+        return
+      }
+      eventSource = source
+
+      source.onmessage = (event) => {
+        const data = JSON.parse(event.data)
+        if (data.type === 'chunk') {
+          setStreamingContent((prev) => prev + data.content)
+        } else if (data.type === 'done') {
+          source.close()
+          void loadDraft()
+        } else if (data.type === 'error') {
+          source.close()
+          addToast({ message: data.message ?? '생성에 실패했습니다.', type: 'error' })
+        }
+      }
+
+      // 네트워크 오류 시 EventSource 가 자동 재연결하며 무한 루프가 될 수 있어 닫는다.
+      // 최종 상태는 useJobStatus 폴링이 확인해 준다.
+      source.onerror = () => source.close()
+    }
+
+    void connect()
+
+    return () => {
+      closed = true
+      eventSource?.close()
+    }
+  }, [jobId, loadDraft, addToast])
+
+  // 스트림을 놓쳤더라도 폴링으로 완료를 감지하면 결과를 불러온다.
   useEffect(() => {
     if (jobStatus?.status === 'succeeded' && draftId && !draft) {
-      loadDraft()
+      void loadDraft()
     }
-  }, [jobStatus?.status, draftId, draft])
+  }, [jobStatus?.status, draftId, draft, loadDraft])
 
   return (
     <div className="bg-[#f9f9f7] min-h-screen">
@@ -332,15 +356,28 @@ export default function NewDraftPage() {
                     />
                     <span className="font-semibold text-[#111111]">내 Style DNA 사용</span>
                   </label>
-                  {useStyleProfile && (
-                    <input
-                      type="text"
-                      value={styleProfileId}
-                      onChange={(e) => setStyleProfileId(e.target.value)}
-                      placeholder="Style Profile ID (선택사항)"
-                      className="w-full mt-4 p-4 border border-black/10 rounded-2xl focus:ring-2 focus:ring-[#d1fb52] bg-[#f9f9f7]"
-                    />
-                  )}
+                  {useStyleProfile &&
+                    (styleProfiles.length > 0 ? (
+                      <select
+                        value={styleProfileId}
+                        onChange={(e) => setStyleProfileId(e.target.value)}
+                        className="w-full mt-4 p-4 border border-black/10 rounded-2xl focus:ring-2 focus:ring-[#d1fb52] bg-[#f9f9f7]"
+                      >
+                        <option value="">스타일 없이 생성</option>
+                        {styleProfiles.map((profile) => (
+                          <option key={profile.id} value={profile.id}>
+                            {profile.blog_url}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <p className="mt-4 text-sm text-[#666666]">
+                        아직 완성된 Style DNA가 없습니다.{' '}
+                        <Link href="/onboarding/style" className="underline hover:text-[#111111]">
+                          Style DNA 만들기 →
+                        </Link>
+                      </p>
+                    ))}
                 </div>
               </div>
             </div>
