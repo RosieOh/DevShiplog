@@ -20,6 +20,8 @@ from src.infrastructure.database.models.tag import PostTag, Tag
 from src.infrastructure.database.models.series import Series, SeriesPost
 from src.infrastructure.database.models.social import Comment, Follow, Notification, PostLike
 from src.infrastructure.database.models.moderation import Report, UserBlock
+from src.infrastructure.database.models.post_view import PostView
+from src.infrastructure.database.models.password_reset import PasswordResetToken
 
 __all__ = [
     "User",
@@ -41,4 +43,6 @@ __all__ = [
     "Notification",
     "Report",
     "UserBlock",
+    "PostView",
+    "PasswordResetToken",
 ]
