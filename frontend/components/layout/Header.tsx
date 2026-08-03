@@ -7,7 +7,7 @@ import { useSession, signOut } from 'next-auth/react'
 import Avatar from '@/components/ui/Avatar'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import { CloseIcon, MenuIcon } from '@/components/ui/icons'
-import { socialService } from '@/features/social/services/socialService'
+import { useUnreadNotifications } from '@/features/social/hooks/useUnreadNotifications'
 import { profileService } from '@/features/profile/services/profileService'
 
 const APP_NAV = [
@@ -20,7 +20,6 @@ export default function Header() {
   const { data: session, status } = useSession()
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [unread, setUnread] = useState(0)
   const [handle, setHandle] = useState<string | null>(null)
   const toggleRef = useRef<HTMLButtonElement>(null)
 
@@ -38,13 +37,12 @@ export default function Header() {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [menuOpen])
 
-  // 읽지 않은 알림 수와 내 블로그 주소는 헤더에서 늘 보여야 한다.
+  // 읽지 않은 알림 수는 서버가 밀어준다 (SSE, 실패 시 폴링으로 대체).
+  const unread = useUnreadNotifications(status === 'authenticated')
+
+  // 내 블로그 주소는 헤더에서 늘 보여야 한다.
   useEffect(() => {
     if (status !== 'authenticated') return
-    socialService
-      .notifications()
-      .then((box) => setUnread(box.unread_count))
-      .catch(() => undefined)
     profileService
       .me()
       .then((me) => setHandle(me.handle))
