@@ -30,6 +30,24 @@ from src.ports.output.repositories.user_repository import UserRepository
 router = APIRouter()
 
 
+def _cleanup_orphan(url: Optional[str]) -> None:
+    """참조가 사라진 업로드 파일을 지운다.
+
+    반드시 캐시 무효화 뒤에 호출한다. 먼저 지우면, 아직 옛 커버를 가리키는
+    캐시된 목록 페이지가 깨진 이미지를 내보내는 구간이 생긴다.
+    정리는 부가작업이라 실패해도 조용히 넘어간다.
+    """
+    if not url:
+        return
+    try:
+        from src.application.use_cases.upload.upload_image import DeleteUploadUseCase
+        from src.infrastructure.external.storage import get_storage
+
+        DeleteUploadUseCase(get_storage()).execute(url)
+    except Exception:
+        pass
+
+
 class PublishRequest(BaseModel):
     draft_id: str
     title: str = Field(min_length=1, max_length=300)
@@ -97,6 +115,8 @@ def publish(
         revalidation.notify,
         revalidation.tags_for_post(user.handle if user else None, result["slug"]),
     )
+    # BackgroundTasks 는 등록 순서대로 돈다. 무효화 뒤에 파일을 지운다.
+    background.add_task(_cleanup_orphan, result.pop("orphan_cover_url", None))
     return result
 
 
@@ -191,4 +211,5 @@ def delete_post(
         revalidation.notify,
         revalidation.tags_for_post(user.handle if user else None, slug),
     )
+    background.add_task(_cleanup_orphan, result.pop("orphan_cover_url", None))
     return result
