@@ -6,7 +6,6 @@
 Devshiplog/
 ├── frontend/              # Next.js (Feature-based)
 ├── backend/               # FastAPI (Hexagonal)
-├── shared/                # 공통 타입/유틸리티
 ├── docker-compose.yml     # 로컬 개발 환경
 └── README.md
 ```
@@ -367,7 +366,7 @@ GITHUB_CLIENT_SECRET=...
    - `docker-compose up` (MariaDB, Redis)
    - Backend: `uvicorn src.main:app --reload`
    - Frontend: `npm run dev`
-   - Worker: `celery -A infrastructure.queue.celery_app worker`
+   - Worker: `celery -A src.infrastructure.queue.celery_app worker`
 
 2. **테스트**
    - Backend: `pytest`
