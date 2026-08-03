@@ -1,30 +1,40 @@
 from abc import ABC, abstractmethod
-from typing import Optional
-from infrastructure.database.models.job import Job, JobType, JobStatus
+from datetime import datetime
+from typing import TYPE_CHECKING, Optional
+
+from src.domain.enums import JobStatus, JobType
+
+if TYPE_CHECKING:
+    from src.infrastructure.database.models.job import Job
 
 
 class JobRepository(ABC):
     @abstractmethod
-    async def create(
+    def create(
         self,
         user_id: str,
         job_type: JobType,
         status: JobStatus = JobStatus.QUEUED,
-    ) -> Job:
-        pass
+        result_ref: Optional[dict] = None,
+    ) -> "Job":
+        ...
 
     @abstractmethod
-    async def get_by_id(self, job_id: str) -> Optional[Job]:
-        pass
+    def get_by_id(self, job_id: str) -> Optional["Job"]:
+        ...
 
     @abstractmethod
-    async def update_status(
+    def update_status(
         self,
         job_id: str,
-        status: JobStatus,
-        progress: int = None,
-        result_ref: dict = None,
-        error_text: str = None,
-    ) -> Job:
-        pass
+        status: Optional[JobStatus] = None,
+        progress: Optional[int] = None,
+        result_ref: Optional[dict] = None,
+        error_text: Optional[str] = None,
+    ) -> "Job":
+        ...
 
+    @abstractmethod
+    def count_since(self, user_id: str, since: datetime) -> int:
+        """특정 시각 이후 사용자가 만든 Job 수 (사용량 쿼터 계산용)."""
+        ...
