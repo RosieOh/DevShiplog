@@ -1,12 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy.orm import Session
 
+from src.application.use_cases.auth.password_reset import (
+    ConfirmPasswordResetUseCase,
+    RequestPasswordResetUseCase,
+)
 from src.infrastructure.auth.jwt_handler import (
     create_access_token,
     get_password_hash,
     verify_password,
 )
-from src.ports.input.api.v1.dependencies import get_current_user_id, get_user_repo
+from src.infrastructure.config.settings import settings
+from src.infrastructure.database.session import get_db
+from src.infrastructure.external import mail
+from src.ports.input.api.v1.dependencies import (
+    client_identity,
+    enforce_rate_limit,
+    get_current_user_id,
+    get_user_repo,
+)
 from src.ports.output.repositories.user_repository import UserRepository
 
 router = APIRouter()
@@ -83,6 +96,57 @@ def login(
         access_token=create_access_token(data={"sub": user.id}),
         user=UserPayload(id=user.id, email=user.email, name=user.name),
     )
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str = Field(min_length=16, max_length=200)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+@router.post("/password-reset", status_code=status.HTTP_202_ACCEPTED)
+def request_password_reset(
+    request: Request,
+    payload: PasswordResetRequest,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user_repo: UserRepository = Depends(get_user_repo),
+):
+    """재설정 메일을 보낸다.
+
+    가입 여부와 무관하게 항상 같은 응답을 낸다. 응답이 갈리면 이 엔드포인트가
+    "이 이메일이 우리 서비스에 있는가" 를 조회하는 도구가 된다.
+    """
+    enforce_rate_limit("password_reset", client_identity(request))
+
+    token = RequestPasswordResetUseCase(db, user_repo).execute(payload.email)
+    if token:
+        origin = (settings.FRONTEND_ORIGIN or "http://localhost:3000").rstrip("/")
+        # 메일 발송은 SMTP 응답을 기다린다. 요청을 붙잡지 않도록 뒤로 넘긴다.
+        background.add_task(
+            mail.send_password_reset,
+            payload.email,
+            f"{origin}/auth/reset?token={token}",
+            settings.PASSWORD_RESET_TTL_MINUTES,
+        )
+
+    return {"message": "가입된 주소라면 재설정 메일을 보냈습니다."}
+
+
+@router.post("/password-reset/confirm")
+def confirm_password_reset(
+    request: Request,
+    payload: PasswordResetConfirm,
+    db: Session = Depends(get_db),
+    user_repo: UserRepository = Depends(get_user_repo),
+):
+    """토큰으로 비밀번호를 바꾼다."""
+    enforce_rate_limit("password_reset", client_identity(request))
+    ConfirmPasswordResetUseCase(db, user_repo).execute(payload.token, payload.new_password)
+    return {"message": "비밀번호를 변경했습니다."}
 
 
 @router.get("/me", response_model=UserPayload)
