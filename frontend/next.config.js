@@ -1,6 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    // instrumentation.ts (캐시 무효화 Redis 구독) 은 Next 14 에서 옵트인이다.
+    instrumentationHook: true,
+    /*
+     * ioredis 는 번들에 넣지 않고 Node 가 직접 require 하게 한다.
+     * instrumentation 은 edge 런타임용으로도 컴파일되는데, 거기에는 net/dns/tls 가
+     * 없어서 번들링을 시도하는 것만으로 빌드가 깨진다 (실행은 안 되더라도).
+     */
+    serverComponentsExternalPackages: ['ioredis'],
+  },
   async rewrites() {
     return [
       /*
