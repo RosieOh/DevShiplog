@@ -93,7 +93,7 @@ export default function PublishPanel({ draftId }: { draftId: string }) {
 
   if (profile?.needs_handle) {
     return (
-      <div className="rounded-[32px] border border-black/5 bg-surface p-8">
+      <div className="rounded-lg border border-border-subtle bg-surface p-8">
         <h2 className="text-2xl font-bold text-ink">발행하려면 아이디가 필요합니다</h2>
         <p className="mt-3 text-ink-muted">
           블로그 주소가 <code className="font-mono">devshiplog.com/@아이디</code> 형태라, 아이디를
@@ -101,7 +101,7 @@ export default function PublishPanel({ draftId }: { draftId: string }) {
         </p>
         <Link
           href="/settings"
-          className="mt-6 inline-flex min-h-touch items-center rounded-full bg-accent px-8 font-semibold text-ink motion-safe:hover:scale-105 transition-transform"
+          className="mt-6 inline-flex min-h-touch items-center rounded bg-ink px-8 font-semibold text-bg transition-opacity hover:opacity-85"
         >
           아이디 정하러 가기
         </Link>
@@ -110,12 +110,12 @@ export default function PublishPanel({ draftId }: { draftId: string }) {
   }
 
   return (
-    <div className="rounded-[32px] border border-black/5 bg-surface p-8">
+    <div className="rounded-lg border border-border-subtle bg-surface p-8">
       <h2 className="text-2xl font-bold text-ink">발행</h2>
 
       {state?.published && (
-        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl bg-accent/20 p-4 text-sm">
-          <CheckCircleIcon className="h-5 w-5 text-accent-ink" />
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded bg-accent/20 p-4 text-sm">
+          <CheckCircleIcon className="h-5 w-5 text-accent-text" />
           <span className="text-ink">
             {state.status === 'published' ? '발행됨' : '내려둠'} ·{' '}
             {state.url && (
@@ -138,7 +138,7 @@ export default function PublishPanel({ draftId }: { draftId: string }) {
             onChange={(e) => setTitle(e.target.value)}
             maxLength={300}
             placeholder="글 제목"
-            className="mt-2 w-full rounded-2xl border border-black/10 bg-canvas p-4 text-lg"
+            className="mt-2 w-full rounded border border-border bg-bg p-4 text-lg"
           />
           <p className="mt-2 text-sm text-ink-muted">
             제목이 곧 주소가 됩니다. 발행 후 제목을 바꿔도 주소는 유지됩니다.
@@ -160,7 +160,7 @@ export default function PublishPanel({ draftId }: { draftId: string }) {
               }
             }}
             placeholder="Enter 로 추가 (최대 10개)"
-            className="mt-2 w-full rounded-2xl border border-black/10 bg-canvas p-3"
+            className="mt-2 w-full rounded border border-border bg-bg p-3"
           />
           {tags.length > 0 && (
             <ul className="mt-3 flex flex-wrap gap-2">
@@ -170,7 +170,7 @@ export default function PublishPanel({ draftId }: { draftId: string }) {
                     type="button"
                     onClick={() => setTags(tags.filter((t) => t !== tag))}
                     aria-label={`${tag} 태그 제거`}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-canvas px-3 py-1.5 text-sm text-ink hover:border-black/20"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg px-3 py-1.5 text-sm text-ink hover:border-ink-faint"
                   >
                     {tag}
                     <span aria-hidden="true" className="text-ink-muted">
@@ -184,9 +184,9 @@ export default function PublishPanel({ draftId }: { draftId: string }) {
         </div>
 
         {sensitiveWarned && (
-          <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-            <AlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-900" />
-            <div className="text-sm text-amber-900">
+          <div className="flex gap-3 rounded border border-warning/30 bg-warning/10 p-4">
+            <AlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
+            <div className="text-sm text-warning">
               <p className="font-semibold">민감정보로 보이는 값이 있습니다.</p>
               <p className="mt-1">
                 공개된 글은 되돌릴 수 없습니다. Safety 탭에서 처리하거나, 확인했다면 아래 버튼으로
@@ -196,7 +196,7 @@ export default function PublishPanel({ draftId }: { draftId: string }) {
                 type="button"
                 onClick={() => publish(true)}
                 disabled={busy}
-                className="mt-3 inline-flex min-h-touch items-center rounded-full border border-amber-300 bg-surface px-5 font-semibold text-amber-900"
+                className="mt-3 inline-flex min-h-touch items-center rounded border border-warning/40 bg-surface px-5 font-semibold text-warning"
               >
                 확인했습니다, 그대로 발행
               </button>
@@ -204,12 +204,12 @@ export default function PublishPanel({ draftId }: { draftId: string }) {
           </div>
         )}
 
-        <div className="flex flex-wrap gap-3 border-t border-black/10 pt-6">
+        <div className="flex flex-wrap gap-3 border-t border-border pt-6">
           <button
             type="button"
             onClick={() => publish(false)}
             disabled={busy}
-            className="inline-flex min-h-touch items-center rounded-full bg-accent px-8 font-semibold text-ink motion-safe:hover:scale-105 transition-transform disabled:bg-gray-300"
+            className="inline-flex min-h-touch items-center rounded bg-ink px-8 font-semibold text-bg transition-opacity hover:opacity-85 disabled:opacity-50"
           >
             {busy ? '처리 중...' : state?.published ? '수정 내용 반영' : '발행하기'}
           </button>
@@ -218,7 +218,7 @@ export default function PublishPanel({ draftId }: { draftId: string }) {
               type="button"
               onClick={unpublish}
               disabled={busy}
-              className="inline-flex min-h-touch items-center rounded-full border border-black/10 bg-surface px-6 font-semibold text-ink hover:bg-canvas"
+              className="inline-flex min-h-touch items-center rounded border border-border bg-surface px-6 font-semibold text-ink hover:bg-bg"
             >
               내리기
             </button>
