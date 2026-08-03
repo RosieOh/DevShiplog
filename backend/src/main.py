@@ -1,8 +1,11 @@
 import logging
 
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from src.application.errors import ApplicationError
 from src.infrastructure.config.settings import settings
@@ -49,6 +52,16 @@ async def unhandled_error_handler(request: Request, exc: Exception):
 
 
 app.include_router(api_router, prefix="/api/v1")
+
+# 업로드된 이미지 서빙.
+# 운영에서는 S3/CDN 이 맡아야 한다. 앱 서버가 정적 파일을 나르면 확장이 막힌다.
+_upload_root = Path(settings.UPLOAD_DIR)
+_upload_root.mkdir(parents=True, exist_ok=True)
+app.mount(
+    settings.UPLOAD_PUBLIC_PREFIX,
+    StaticFiles(directory=_upload_root),
+    name="uploads",
+)
 
 
 @app.get("/")
