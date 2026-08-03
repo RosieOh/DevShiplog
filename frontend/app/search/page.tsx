@@ -18,9 +18,9 @@ export default async function SearchPage({
   const posts = result?.items ?? []
 
   return (
-    <div className="bg-canvas min-h-screen">
+    <div className="bg-bg min-h-screen">
       <div className="mx-auto max-w-[820px] px-[5%] py-12">
-        <form action="/search" method="get" className="border-b border-black/10 pb-8">
+        <form action="/search" method="get" className="border-b border-border pb-8">
           <label htmlFor="q" className="block text-sm font-semibold text-ink">
             검색
           </label>
@@ -31,11 +31,11 @@ export default async function SearchPage({
               type="search"
               defaultValue={query}
               placeholder="제목이나 요약으로 검색"
-              className="flex-1 rounded-2xl border border-black/10 bg-surface p-4"
+              className="flex-1 rounded border border-border bg-surface p-4"
             />
             <button
               type="submit"
-              className="inline-flex min-h-touch items-center rounded-full bg-accent px-6 font-semibold text-ink"
+              className="inline-flex min-h-touch items-center rounded bg-ink px-6 font-semibold text-bg"
             >
               검색
             </button>
