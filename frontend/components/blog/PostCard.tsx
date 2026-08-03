@@ -40,7 +40,7 @@ export default function PostCard({ post }: { post: PostCardData }) {
               <li key={tag}>
                 <Link
                   href={`/tags/${encodeURIComponent(tag.toLowerCase())}`}
-                  className="inline-flex items-center rounded-full bg-surface-2 px-2.5 py-1 text-xs font-medium text-ink-muted transition-colors hover:text-accent-text"
+                  className="inline-flex min-h-[32px] items-center rounded-full bg-surface-2 px-3 text-xs font-medium text-ink-muted transition-colors hover:text-accent-text"
                 >
                   {tag}
                 </Link>
