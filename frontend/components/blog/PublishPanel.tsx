@@ -7,6 +7,7 @@ import { profileService, MyProfile } from '@/features/profile/services/profileSe
 import { useToastStore } from '@/store/toastStore'
 import { AlertIcon, CheckCircleIcon } from '@/components/ui/icons'
 import { revalidateContent, tagsForPostUrl } from '@/lib/revalidate'
+import ImageUploader from '@/components/ui/ImageUploader'
 
 const MAX_TAGS = 10
 
@@ -17,6 +18,7 @@ export default function PublishPanel({ draftId }: { draftId: string }) {
   const [title, setTitle] = useState('')
   const [tagInput, setTagInput] = useState('')
   const [tags, setTags] = useState<string[]>([])
+  const [coverUrl, setCoverUrl] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   // 민감정보 경고를 한 번 본 뒤에만 강행할 수 있게 한다.
   const [sensitiveWarned, setSensitiveWarned] = useState(false)
@@ -54,6 +56,7 @@ export default function PublishPanel({ draftId }: { draftId: string }) {
         draft_id: draftId,
         title: title.trim(),
         tags,
+        cover_url: coverUrl ?? undefined,
         allow_sensitive: allowSensitive,
       })
       setState({ published: true, ...result })
@@ -143,6 +146,33 @@ export default function PublishPanel({ draftId }: { draftId: string }) {
           <p className="mt-2 text-sm text-ink-muted">
             제목이 곧 주소가 됩니다. 발행 후 제목을 바꿔도 주소는 유지됩니다.
           </p>
+        </div>
+
+        <div>
+          <span className="block text-sm font-semibold text-ink">커버 이미지</span>
+          <p className="mt-1 text-sm text-ink-muted">
+            목록 카드와 SNS 미리보기에 쓰입니다. 없으면 카드는 글자만으로 표시됩니다.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            {coverUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={coverUrl}
+                alt="선택한 커버 이미지 미리보기"
+                className="h-24 w-40 rounded border border-border object-cover"
+              />
+            )}
+            <ImageUploader onUploaded={setCoverUrl} label={coverUrl ? '이미지 변경' : '이미지 선택'} />
+            {coverUrl && (
+              <button
+                type="button"
+                onClick={() => setCoverUrl(null)}
+                className="inline-flex min-h-touch items-center px-2 text-sm text-ink-muted hover:text-ink"
+              >
+                제거
+              </button>
+            )}
+          </div>
         </div>
 
         <div>
