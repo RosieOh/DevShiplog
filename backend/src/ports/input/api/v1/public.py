@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from src.ports.input.api.v1.dependencies import (
+    get_block_repo,
     get_comment_repo,
     get_follow_repo,
     get_like_repo,
@@ -74,22 +75,52 @@ def _paged(items: List, limit: int) -> Dict[str, Any]:
 # ------------------------------------------------------------------- 피드
 
 
+# 트렌딩 기간 선택지 (Velog 의 "이번 주" 드롭다운에 해당)
+PERIOD_DAYS = {"week": 7, "month": 30, "year": 365, "all": None}
+
+
 @router.get("/feed", response_model=PostList)
 def feed(
-    sort: str = Query("recent", pattern="^(recent|trending)$"),
+    sort: str = Query("recent", pattern="^(recent|trending|recommended|following)$"),
+    period: str = Query("week", pattern="^(week|month|year|all)$"),
     tag: Optional[str] = None,
     limit: int = Query(20, ge=1, le=MAX_PAGE_SIZE),
     offset: int = Query(0, ge=0),
+    viewer_id: Optional[str] = Depends(get_optional_user_id),
     post_repo: PostRepository = Depends(get_post_repo),
+    block_repo: BlockRepository = Depends(get_block_repo),
 ):
-    """홈 피드. 최신순 또는 인기순."""
+    """홈 피드.
+
+    - recent      : 최신순
+    - trending    : 반응 가중치 + 기간 필터
+    - recommended : 내가 좋아요한 글의 태그와 겹치는 글 (로그인 필요, 없으면 트렌딩)
+    - following   : 내가 팔로우한 사람의 글 (로그인 필요, 없으면 최신)
+    """
+    # 차단한 사람의 글은 내 화면에서 빠져야 한다.
+    blocked = block_repo.blocked_ids(viewer_id) if viewer_id else []
+
+    if sort == "following":
+        if not viewer_id:
+            return _paged(post_repo.list_feed(limit=limit + 1, offset=offset), limit)
+        return _paged(post_repo.list_following_feed(viewer_id, limit + 1, offset), limit)
+
+    if sort == "recommended":
+        if viewer_id:
+            posts = post_repo.list_recommended(viewer_id, limit + 1, offset)
+            if posts:
+                return _paged(posts, limit)
+        # 신호가 없으면 트렌딩으로 대체한다. 빈 화면을 보여주는 것보다 낫다.
+        sort = "trending"
+
     posts = post_repo.list_feed(
         limit=limit + 1,
         offset=offset,
         sort=sort,
         tag=tag,
         # 인기순은 최근 글 중에서만 뽑는다. 아니면 오래된 글이 상단을 영구 점유한다.
-        since_days=30 if sort == "trending" else None,
+        since_days=PERIOD_DAYS[period] if sort == "trending" else None,
+        exclude_user_ids=blocked,
     )
     return _paged(posts, limit)
 
