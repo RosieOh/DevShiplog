@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import PostCard from '@/components/blog/PostCard'
-import { getFeed, getPopularTags, SITE_NAME, SITE_URL } from '@/lib/api/public'
+import { getFeed, SITE_NAME, SITE_URL } from '@/lib/api/public'
 
 /**
  * 홈 = 공개 피드.
@@ -23,83 +23,101 @@ export const metadata: Metadata = {
   },
 }
 
+const TABS = [
+  { key: 'trending', label: '트렌딩', href: '/?sort=trending' },
+  { key: 'recent', label: '최신', href: '/' },
+] as const
+
+function TrendIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="m3 17 6-6 4 4 8-8" />
+      <path d="M15 7h6v6" />
+    </svg>
+  )
+}
+
+function ClockIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  )
+}
+
 export default async function HomePage({
   searchParams,
 }: {
   searchParams: { sort?: string }
 }) {
   const sort = searchParams.sort === 'trending' ? 'trending' : 'recent'
-  const [feed, tags] = await Promise.all([getFeed({ sort }), getPopularTags(12)])
+  const feed = await getFeed({ sort, limit: 24 })
   const posts = feed?.items ?? []
 
   return (
-    <div className="bg-canvas min-h-screen">
-      <div className="mx-auto max-w-[1100px] px-[5%] py-12">
-        <div className="grid gap-12 lg:grid-cols-[1fr_260px]">
-          <main>
-            <div className="mb-8 flex items-center gap-1 border-b border-black/10 pb-4">
-              {(
-                [
-                  { key: 'recent', label: '최신' },
-                  { key: 'trending', label: '인기' },
-                ] as const
-              ).map((t) => (
-                <Link
-                  key={t.key}
-                  href={t.key === 'recent' ? '/' : '/?sort=trending'}
-                  aria-current={sort === t.key ? 'page' : undefined}
-                  className={`inline-flex min-h-touch items-center rounded-full px-4 text-sm font-semibold transition-colors ${
-                    sort === t.key ? 'bg-accent text-ink' : 'text-ink-muted hover:text-ink'
-                  }`}
-                >
-                  {t.label}
-                </Link>
-              ))}
-            </div>
+    <div className="mx-auto max-w-shell px-4 py-6 md:px-6">
+      <nav aria-label="정렬" className="mb-6 flex items-center gap-6 border-b border-border">
+        {TABS.map((tab) => {
+          const active = sort === tab.key
+          const Icon = tab.key === 'trending' ? TrendIcon : ClockIcon
+          return (
+            <Link
+              key={tab.key}
+              href={tab.href}
+              aria-current={active ? 'page' : undefined}
+              className={`-mb-px flex items-center gap-1.5 border-b-2 pb-3 pt-1 text-lg transition-colors ${
+                active
+                  ? 'border-ink font-bold text-ink'
+                  : 'border-transparent font-medium text-ink-faint hover:text-ink'
+              }`}
+            >
+              <Icon className="h-5 w-5" />
+              {tab.label}
+            </Link>
+          )
+        })}
+      </nav>
 
-            {posts.length === 0 ? (
-              <div className="rounded-[32px] border border-black/5 bg-surface p-12 text-center">
-                <h1 className="text-2xl font-bold text-ink">아직 발행된 글이 없습니다</h1>
-                <p className="mt-3 text-ink-muted">첫 글을 써서 이 자리를 채워보세요.</p>
-                <Link
-                  href="/drafts/new"
-                  className="mt-6 inline-flex min-h-touch items-center rounded-full bg-accent px-8 font-semibold text-ink motion-safe:hover:scale-105 transition-transform"
-                >
-                  글 쓰러 가기
-                </Link>
-              </div>
-            ) : (
-              <>
-                <h1 className="sr-only">{sort === 'trending' ? '인기 글' : '최신 글'}</h1>
-                {posts.map((post) => (
-                  <PostCard key={post.id} post={post} />
-                ))}
-              </>
-            )}
-          </main>
-
-          <aside className="lg:pt-4">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-ink-muted">태그</h2>
-            {tags && tags.length > 0 ? (
-              <ul className="mt-4 flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <li key={tag.name}>
-                    <Link
-                      href={`/tags/${encodeURIComponent(tag.name)}`}
-                      className="inline-flex items-center rounded-full border border-black/10 bg-surface px-3 py-1.5 text-sm text-ink-muted transition-colors hover:border-black/20 hover:text-ink"
-                    >
-                      {tag.display_name}
-                      <span className="ml-1.5 text-xs text-ink-muted/70">{tag.post_count}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-4 text-sm text-ink-muted">아직 태그가 없습니다.</p>
-            )}
-          </aside>
+      {posts.length === 0 ? (
+        <div className="rounded bg-surface px-6 py-20 text-center shadow-card">
+          <h1 className="text-xl font-bold text-ink">아직 발행된 글이 없습니다</h1>
+          <p className="mt-2 text-sm text-ink-muted">첫 글을 써서 이 자리를 채워보세요.</p>
+          <Link
+            href="/drafts/new"
+            className="mt-6 inline-flex min-h-touch items-center rounded bg-ink px-6 text-sm font-bold text-bg transition-opacity hover:opacity-85"
+          >
+            글 쓰러 가기
+          </Link>
         </div>
-      </div>
+      ) : (
+        <>
+          <h1 className="sr-only">{sort === 'trending' ? '인기 글' : '최신 글'}</h1>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {posts.map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }
