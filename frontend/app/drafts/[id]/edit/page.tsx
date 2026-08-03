@@ -9,7 +9,9 @@ import { useJobStatus } from '@/features/drafts/hooks/useJobStatus'
 import { useToastStore } from '@/store/toastStore'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeHighlight from 'rehype-highlight'
 import Link from 'next/link'
+import MarkdownEditor from '@/components/editor/MarkdownEditor'
 import { AlertIcon, CheckCircleIcon, ClipboardIcon, DownloadIcon } from '@/components/ui/icons'
 import PublishPanel from '@/components/blog/PublishPanel'
 
@@ -17,6 +19,16 @@ const AUTOSAVE_DELAY_MS = 2000
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback
+}
+
+/** 409 응답에서 서버의 현재 내용을 꺼낸다. 충돌이 아니면 null. */
+function staleConflict(err: unknown): { content: string; revision: number } | null {
+  const body = (err as { status?: number; body?: Record<string, unknown> })?.body
+  if ((err as { status?: number })?.status !== 409 || !body) return null
+  return {
+    content: String(body.current_content_md ?? ''),
+    revision: Number(body.current_revision ?? 0),
+  }
 }
 
 export default function DraftEditPage() {
@@ -40,6 +52,18 @@ export default function DraftEditPage() {
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
   // 서버에 저장된 최신 내용. 이 값과 같으면 자동저장을 건너뛴다.
   const savedContentRef = useRef<string>('')
+  // 서버가 준 마지막 revision. 자동저장 때 같이 보내 충돌을 감지한다.
+  const revisionRef = useRef<number | null>(null)
+  const previewRef = useRef<HTMLDivElement>(null)
+  const [conflict, setConflict] = useState<{ content: string; revision: number } | null>(null)
+
+  /** 편집기 스크롤 비율을 미리보기에 그대로 옮긴다. */
+  const syncPreviewScroll = useCallback((ratio: number) => {
+    const el = previewRef.current
+    if (!el) return
+    // 줄 높이가 서로 달라서 정확히는 못 맞춘다. 비율만 맞춰도 "지금 여기" 는 따라온다.
+    el.scrollTop = ratio * (el.scrollHeight - el.clientHeight)
+  }, [])
 
   const { jobStatus: transformJob } = useJobStatus(transformJobId)
 
@@ -50,6 +74,7 @@ export default function DraftEditPage() {
       const loadedContent = loadedDraft.latest_version?.content_md || ''
       setContent(loadedContent)
       savedContentRef.current = loadedContent
+      revisionRef.current = loadedDraft.latest_version?.revision ?? null
       setVersions(await draftService.getVersions(draftId))
     } catch (err) {
       addToast({ message: errorMessage(err, 'Draft 를 불러오지 못했습니다.'), type: 'error' })
@@ -74,14 +99,27 @@ export default function DraftEditPage() {
       try {
         setSaving(true)
         // 자동저장은 새 버전을 만들지 않고 최신 버전을 제자리에서 수정한다.
-        await draftService.saveContent(draftId, {
+        const saved = await draftService.saveContent(draftId, {
           content_md: content,
           meta_json: draft?.latest_version?.meta_json ?? null,
+          base_revision: revisionRef.current ?? undefined,
         })
         savedContentRef.current = content
+        revisionRef.current = saved.revision ?? null
+        setConflict(null)
         setLastSavedAt(new Date())
         if (!silent) addToast({ message: '저장되었습니다.', type: 'success' })
       } catch (err) {
+        /*
+         * 409 = 내가 읽은 뒤에 다른 탭·기기에서 저장이 있었다.
+         * 조용히 덮어쓰면 남의(혹은 내 다른 탭의) 글이 흔적 없이 사라진다.
+         * 자동저장을 멈추고 사용자가 고르게 한다.
+         */
+        const stale = staleConflict(err)
+        if (stale) {
+          setConflict(stale)
+          return
+        }
         addToast({ message: errorMessage(err, '저장에 실패했습니다.'), type: 'error' })
       } finally {
         setSaving(false)
@@ -90,9 +128,30 @@ export default function DraftEditPage() {
     [content, draftId, draft, addToast]
   )
 
+  /** 서버가 보낸 현재 내용으로 갈아탄다 (내가 쓰던 것은 버린다). */
+  const acceptRemote = () => {
+    if (!conflict) return
+    setContent(conflict.content)
+    savedContentRef.current = conflict.content
+    revisionRef.current = conflict.revision
+    setConflict(null)
+    addToast({ message: '다른 곳에서 저장한 내용을 불러왔습니다.', type: 'info' })
+  }
+
+  /** 내가 쓰던 것으로 덮어쓴다. */
+  const overwriteRemote = async () => {
+    if (!conflict) return
+    revisionRef.current = conflict.revision
+    setConflict(null)
+    await saveContent(false)
+  }
+
   // 자동 저장 (debounce)
   useEffect(() => {
     if (loading || !draft) return
+    // 충돌이 떠 있는 동안은 자동저장을 멈춘다. 안 그러면 사용자가 고르기도 전에
+    // 다시 시도해서 같은 409 를 반복하거나, 잘못 덮어쓴다.
+    if (conflict) return
 
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
     autoSaveTimerRef.current = setTimeout(() => void saveContent(true), AUTOSAVE_DELAY_MS)
@@ -100,7 +159,7 @@ export default function DraftEditPage() {
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
     }
-  }, [content, loading, draft, saveContent])
+  }, [content, loading, draft, conflict, saveContent])
 
   /** 되돌리기 지점을 남기는 명시적 버전 저장 */
   const handleCreateSnapshot = async () => {
@@ -323,23 +382,71 @@ export default function DraftEditPage() {
           </div>
         </div>
 
+        {conflict && (
+          <div
+            role="alert"
+            className="mb-6 rounded border border-warning/40 bg-warning/10 p-6"
+          >
+            <h2 className="text-lg font-bold text-ink">다른 곳에서 이 글을 먼저 저장했습니다</h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+              다른 탭이나 기기에서 저장한 내용이 있습니다. 그대로 저장하면 그 내용이
+              사라집니다. 어느 쪽을 남길지 골라주세요.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => void overwriteRemote()}
+                className="inline-flex min-h-touch items-center rounded bg-ink px-5 text-sm font-bold text-bg transition-opacity hover:opacity-85"
+              >
+                내가 쓴 것으로 덮어쓰기
+              </button>
+              <button
+                type="button"
+                onClick={acceptRemote}
+                className="inline-flex min-h-touch items-center rounded border border-border bg-surface px-5 text-sm font-bold text-ink transition-colors hover:bg-bg"
+              >
+                저쪽 내용 불러오기
+              </button>
+            </div>
+            <details className="mt-5">
+              <summary className="cursor-pointer text-sm font-medium text-ink-muted hover:text-ink">
+                저쪽 내용 미리보기
+              </summary>
+              <pre className="mt-3 max-h-64 overflow-auto rounded bg-bg p-4 text-xs leading-relaxed text-ink-muted">
+                {conflict.content}
+              </pre>
+            </details>
+          </div>
+        )}
+
         {activeTab === 'content' && (
-          <div className="grid lg:grid-cols-2 gap-8">
-            <div className="bg-surface rounded-lg border border-border-subtle p-8">
-              <div className="flex justify-between items-center mb-6">
+          <div className="grid gap-8 lg:grid-cols-2">
+            <div className="rounded-lg border border-border-subtle bg-surface p-8">
+              <div className="mb-6 flex items-center justify-between">
                 <h2 className="text-2xl font-bold text-ink">Markdown 에디터</h2>
                 {saving && <span className="text-sm text-ink-muted">저장 중...</span>}
               </div>
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                className="w-full h-[600px] p-6 border border-border rounded font-mono text-sm bg-bg resize-none"
-              />
+              <div className="h-[600px]">
+                <MarkdownEditor
+                  value={content}
+                  onChange={setContent}
+                  onScrollRatio={syncPreviewScroll}
+                />
+              </div>
             </div>
-            <div className="bg-surface rounded-lg border border-border-subtle p-8">
-              <h2 className="text-2xl font-bold mb-6 text-ink">Preview</h2>
-              <div className="w-full h-[600px] p-6 border border-border rounded overflow-y-auto prose max-w-none bg-bg">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+            <div className="rounded-lg border border-border-subtle bg-surface p-8">
+              <h2 className="mb-6 text-2xl font-bold text-ink">Preview</h2>
+              <div
+                ref={previewRef}
+                className="prose h-[600px] w-full max-w-none overflow-y-auto rounded border border-border bg-bg p-6"
+              >
+                {/* 공개 페이지와 같은 렌더러를 쓴다. 미리보기가 실제와 다르면 미리보기가 아니다. */}
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[[rehypeHighlight, { detect: false, ignoreMissing: true }]]}
+                >
+                  {content}
+                </ReactMarkdown>
               </div>
             </div>
           </div>
