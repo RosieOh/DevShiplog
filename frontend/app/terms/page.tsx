@@ -146,7 +146,7 @@ export default function TermsPage() {
           </section>
         </div>
 
-        <div className="mt-16 pt-8 border-t border-line">
+        <div className="mt-16 pt-8 border-t border-border">
           <p className="text-ink-muted text-sm">
             본 약관에 대한 문의사항이 있으시면 다음 연락처로 문의해 주시기 바랍니다.
           </p>
