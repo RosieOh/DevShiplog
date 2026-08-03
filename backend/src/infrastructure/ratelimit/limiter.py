@@ -35,6 +35,8 @@ RULES = {
     "upload": Rule(limit=30, window_seconds=3600),
     "signup": Rule(limit=10, window_seconds=3600),
     "login": Rule(limit=20, window_seconds=300),
+    # 재설정 메일은 남의 주소로도 요청할 수 있다. 메일 폭탄으로 쓰이지 않게 좁게 잡는다.
+    "password_reset": Rule(limit=5, window_seconds=3600),
 }
 
 
@@ -86,6 +88,22 @@ class RateLimiter:
             elapsed = int(time.time()) % rule.window_seconds
             return Decision(False, 0, rule.window_seconds - elapsed)
         return Decision(True, rule.limit - count, 0)
+
+    def reset(self) -> None:
+        """카운터를 전부 비운다 (테스트 전용).
+
+        카운터는 프로세스가 아니라 Redis 에 있으므로, 비우지 않으면 앞 테스트가 쓴
+        횟수가 다음 테스트로 넘어가 실패가 실행 순서에 따라 달라진다.
+        """
+        client = self.client
+        if client is None:
+            return
+        try:
+            keys = list(client.scan_iter("rl:*", count=1000))
+            if keys:
+                client.delete(*keys)
+        except Exception:
+            pass
 
 
 rate_limiter = RateLimiter()
