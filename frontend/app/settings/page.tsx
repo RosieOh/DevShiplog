@@ -89,17 +89,17 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="bg-canvas min-h-screen py-24 text-center text-ink-muted">불러오는 중...</div>
+      <div className="bg-bg min-h-screen py-24 text-center text-ink-muted">불러오는 중...</div>
     )
   }
 
   return (
-    <div className="bg-canvas min-h-screen">
+    <div className="bg-bg min-h-screen">
       <div className="mx-auto max-w-[680px] px-[5%] py-12">
         <h1 className="text-4xl font-bold tracking-tight text-ink">블로그 설정</h1>
 
         {profile?.needs_handle && (
-          <div className="mt-6 rounded-2xl border border-accent bg-accent/20 p-5">
+          <div className="mt-6 rounded border border-accent bg-accent/20 p-5">
             <p className="font-semibold text-ink">아이디를 먼저 정해주세요</p>
             <p className="mt-1 text-sm text-ink">
               블로그 주소가 <code className="font-mono">devshiplog.com/@아이디</code> 형태라, 아이디가
@@ -108,7 +108,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        <div className="mt-8 space-y-8 rounded-[32px] border border-black/5 bg-surface p-8">
+        <div className="mt-8 space-y-8 rounded-lg border border-border-subtle bg-surface p-8">
           <div>
             <label htmlFor="handle" className="block text-sm font-semibold text-ink">
               블로그 아이디
@@ -121,7 +121,7 @@ export default function SettingsPage() {
                 onChange={(e) => setHandle(e.target.value)}
                 aria-describedby="handle-hint"
                 placeholder="thoh"
-                className="flex-1 rounded-2xl border border-black/10 bg-canvas p-3 font-mono"
+                className="flex-1 rounded border border-border bg-bg p-3 font-mono"
               />
             </div>
             <p id="handle-hint" className="mt-2 text-sm text-ink-muted">
@@ -131,14 +131,14 @@ export default function SettingsPage() {
             {check && (
               <p
                 className={`mt-2 text-sm font-medium ${
-                  check.available ? 'text-accent-ink' : 'text-red-700'
+                  check.available ? 'text-accent-text' : 'text-danger'
                 }`}
               >
                 {check.available ? '사용할 수 있습니다.' : check.reason}
               </p>
             )}
             {profile?.handle && handle.trim() && handle.trim() !== profile.handle && (
-              <p className="mt-2 text-sm font-medium text-amber-800">
+              <p className="mt-2 text-sm font-medium text-warning">
                 아이디를 바꾸면 이미 발행한 글 {profile.post_count}개의 주소가 전부 바뀝니다. 외부에
                 공유한 링크와 검색 결과가 깨질 수 있습니다.
               </p>
@@ -154,7 +154,7 @@ export default function SettingsPage() {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               maxLength={60}
-              className="mt-2 w-full rounded-2xl border border-black/10 bg-canvas p-3"
+              className="mt-2 w-full rounded border border-border bg-bg p-3"
             />
           </div>
 
@@ -168,17 +168,17 @@ export default function SettingsPage() {
               onChange={(e) => setBio(e.target.value)}
               maxLength={300}
               rows={4}
-              className="mt-2 w-full resize-none rounded-2xl border border-black/10 bg-canvas p-3"
+              className="mt-2 w-full resize-none rounded border border-border bg-bg p-3"
             />
             <p className="mt-1 text-right text-xs text-ink-muted">{bio.length} / 300</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 border-t border-black/10 pt-6">
+          <div className="flex flex-wrap items-center gap-3 border-t border-border pt-6">
             <button
               type="button"
               onClick={save}
               disabled={saving || (check !== null && !check.available)}
-              className="inline-flex min-h-touch items-center rounded-full bg-accent px-8 font-semibold text-ink motion-safe:hover:scale-105 transition-transform disabled:bg-gray-300"
+              className="inline-flex min-h-touch items-center rounded bg-ink px-8 font-semibold text-bg transition-opacity hover:opacity-85 disabled:opacity-50"
             >
               {saving ? '저장 중...' : '저장'}
             </button>
