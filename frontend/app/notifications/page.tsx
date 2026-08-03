@@ -62,17 +62,17 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="bg-canvas min-h-screen">
+    <div className="bg-bg min-h-screen">
       <div className="mx-auto max-w-[680px] px-[5%] py-12">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-black/10 pb-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-6">
           <h1 className="text-4xl font-bold tracking-tight text-ink">
-            알림 {unread > 0 && <span className="text-2xl text-accent-ink">{unread}</span>}
+            알림 {unread > 0 && <span className="text-2xl text-accent-text">{unread}</span>}
           </h1>
           {unread > 0 && (
             <button
               type="button"
               onClick={markAllRead}
-              className="inline-flex min-h-touch items-center rounded-full border border-black/10 bg-surface px-5 text-sm font-semibold text-ink hover:bg-canvas"
+              className="inline-flex min-h-touch items-center rounded border border-border bg-surface px-5 text-sm font-semibold text-ink hover:bg-bg"
             >
               모두 읽음
             </button>
@@ -84,7 +84,7 @@ export default function NotificationsPage() {
         ) : items.length === 0 ? (
           <p className="py-16 text-center text-ink-muted">아직 알림이 없습니다.</p>
         ) : (
-          <ul className="divide-y divide-black/5">
+          <ul className="divide-y divide-border-subtle">
             {items.map((n) => (
               <li
                 key={n.id}
