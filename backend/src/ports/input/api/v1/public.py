@@ -6,7 +6,7 @@
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 
 from src.ports.input.api.v1.dependencies import (
@@ -19,6 +19,7 @@ from src.ports.input.api.v1.dependencies import (
     get_series_repo,
     get_tag_repo,
     get_user_repo,
+    viewer_key,
 )
 from src.ports.output.repositories.moderation_repository import BlockRepository
 from src.ports.output.repositories.post_repository import PostRepository
@@ -194,6 +195,7 @@ def blog_posts(
 
 @router.get("/blogs/{handle}/posts/{slug}")
 def post_detail(
+    request: Request,
     handle: str,
     slug: str,
     viewer_id: Optional[str] = Depends(get_optional_user_id),
@@ -201,12 +203,17 @@ def post_detail(
     like_repo: LikeRepository = Depends(get_like_repo),
     follow_repo: FollowRepository = Depends(get_follow_repo),
     comment_repo: CommentRepository = Depends(get_comment_repo),
+    series_repo: SeriesRepository = Depends(get_series_repo),
 ):
     post = post_repo.get_public(handle, slug)
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="글을 찾을 수 없습니다.")
 
-    post_repo.increment_view(post.id)
+    # 같은 사람의 재방문은 24시간 안에서 한 번만 센다. 새로고침으로 오르는 숫자는
+    # 아무 의미가 없고, 그 숫자를 근거로 하는 트렌딩 정렬까지 같이 망가진다.
+    post_repo.record_view(post.id, viewer_key(request, viewer_id), viewer_id)
+
+    series_context = series_repo.context_for_post(post.id)
 
     comments = comment_repo.list_for_post(post.id)
     roots = [c for c in comments if c.parent_id is None]
@@ -236,6 +243,26 @@ def post_detail(
         "is_liked": bool(viewer_id) and like_repo.exists(post.id, viewer_id),
         "is_following_author": bool(viewer_id) and follow_repo.exists(viewer_id, post.user_id),
         "is_mine": viewer_id == post.user_id,
+        "series": _series_nav(series_context, handle),
+    }
+
+
+def _series_nav(context: Optional[Dict[str, Any]], handle: str) -> Optional[Dict[str, Any]]:
+    """시리즈 앞뒤 네비게이션. 시리즈에 속하지 않으면 None."""
+    if not context:
+        return None
+
+    def link(p) -> Optional[Dict[str, Any]]:
+        return {"title": p.title, "url": f"/@{handle}/{p.slug}"} if p else None
+
+    series = context["series"]
+    return {
+        "name": series.name,
+        "url": f"/@{handle}/series/{series.slug}",
+        "position": context["position"],
+        "total": context["total"],
+        "previous": link(context["previous"]),
+        "next": link(context["next"]),
     }
 
 
