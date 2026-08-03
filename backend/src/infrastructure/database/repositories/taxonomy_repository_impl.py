@@ -4,6 +4,7 @@ from typing import List, Optional, Sequence
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
 
+from src.domain.enums import PostStatus
 from src.domain.services.identity import normalize_tag
 from src.infrastructure.database.models.post import Post
 from src.infrastructure.database.models.series import Series, SeriesPost
@@ -157,3 +158,61 @@ class SeriesRepositoryImpl(SeriesRepository):
             SeriesPost.series_id == series_id, SeriesPost.post_id == post_id
         ).delete(synchronize_session=False)
         self.db.commit()
+
+    def reorder(self, series_id: str, post_ids: List[str]) -> None:
+        links = self.db.query(SeriesPost).filter(SeriesPost.series_id == series_id).all()
+        wanted = {post_id: index for index, post_id in enumerate(post_ids)}
+
+        # 목록에 없는 글은 뒤로 민다. 순서를 잃는 것보다 낫다.
+        for link in links:
+            link.position = wanted.get(link.post_id, len(wanted) + link.position)
+        self.db.commit()
+
+    def delete(self, series_id: str) -> None:
+        series = self.get_by_id(series_id)
+        if series:
+            # SeriesPost 만 cascade 로 사라진다. Post 자체는 건드리지 않는다.
+            self.db.delete(series)
+            self.db.commit()
+
+    def context_for_post(self, post_id: str) -> Optional[dict]:
+        """이 글이 시리즈의 몇 번째이고 앞뒤에 무엇이 있는지.
+
+        시리즈의 실제 값어치는 목록이 아니라 이 네비게이션에 있다. 3편을 읽은 사람이
+        4편으로 갈 길이 없으면 연재로 묶은 의미가 없다.
+
+        위치는 position 이 아니라 "공개된 글만 세어서" 계산한다. 중간 편을 내렸을 때
+        3편 다음이 5편으로 건너뛰면 독자는 뭔가 빠졌다고 읽는다.
+        """
+        link = self.db.query(SeriesPost).filter(SeriesPost.post_id == post_id).first()
+        if not link:
+            return None
+
+        series = self.db.query(Series).filter(Series.id == link.series_id).first()
+        if not series:
+            return None
+
+        siblings = (
+            self.db.query(Post)
+            .join(SeriesPost, SeriesPost.post_id == Post.id)
+            .filter(
+                SeriesPost.series_id == link.series_id,
+                Post.status == PostStatus.PUBLISHED,
+            )
+            .order_by(SeriesPost.position.asc())
+            .all()
+        )
+
+        try:
+            index = next(i for i, p in enumerate(siblings) if p.id == post_id)
+        except StopIteration:
+            # 이 글이 아직 공개 상태가 아니다 (미리보기 등). 순서를 매길 수 없다.
+            return None
+
+        return {
+            "series": series,
+            "position": index + 1,
+            "total": len(siblings),
+            "previous": siblings[index - 1] if index > 0 else None,
+            "next": siblings[index + 1] if index + 1 < len(siblings) else None,
+        }
