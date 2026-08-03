@@ -119,6 +119,7 @@ class PublishPostUseCase:
             "created": created,
             "tags": [t.display_name for t in saved_tags],
             "sensitive_findings": len(blocking),
+            "cover_url": post.cover_url,
         }
 
 
