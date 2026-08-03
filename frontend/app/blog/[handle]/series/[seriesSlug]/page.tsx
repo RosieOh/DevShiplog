@@ -31,9 +31,9 @@ export default async function SeriesPage({ params }: Props) {
   if (!series) notFound()
 
   return (
-    <div className="bg-canvas min-h-screen">
+    <div className="bg-bg min-h-screen">
       <div className="mx-auto max-w-[760px] px-[5%] py-12">
-        <header className="border-b border-black/10 pb-8">
+        <header className="border-b border-border pb-8">
           <Link
             href={`/@${handle}`}
             className="text-sm text-ink-muted transition-colors hover:text-ink"
@@ -52,7 +52,7 @@ export default async function SeriesPage({ params }: Props) {
             <li key={post.id}>
               <Link
                 href={post.url}
-                className="group flex gap-4 rounded-2xl px-4 py-5 transition-colors hover:bg-surface"
+                className="group flex gap-4 rounded px-4 py-5 transition-colors hover:bg-surface"
               >
                 <span className="pt-0.5 text-sm font-semibold tabular-nums text-ink-muted">
                   {String(index + 1).padStart(2, '0')}
