@@ -4,6 +4,9 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+# `src.` 절대 import 가 backend/ 에서 바로 동작하도록 한다.
+pythonpath = ["."]
 
 [tool.black]
 line-length = 100
@@ -18,4 +21,3 @@ python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
-
