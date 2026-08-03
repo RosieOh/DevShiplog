@@ -3,7 +3,9 @@
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from src.infrastructure.config.settings import settings
 
 from src.application.use_cases.post.publish_post import (
     DeletePostUseCase,
@@ -32,9 +34,25 @@ class PublishRequest(BaseModel):
     draft_id: str
     title: str = Field(min_length=1, max_length=300)
     tags: List[str] = Field(default_factory=list, max_length=10)
-    cover_url: Optional[str] = None
+    cover_url: Optional[str] = Field(default=None, max_length=1000)
     # 민감정보 경고를 확인하고도 진행하겠다는 명시적 동의
     allow_sensitive: bool = False
+
+    @field_validator("cover_url")
+    @classmethod
+    def _cover_must_be_safe(cls, value: Optional[str]) -> Optional[str]:
+        """커버 주소는 우리 업로드 경로이거나 https 여야 한다.
+
+        클라이언트가 보낸 문자열이 그대로 <img src> 와 og:image 에 들어간다.
+        검사하지 않으면 javascript:/data: 스킴이나 남의 추적 픽셀을 우리 글에 심을 수 있다.
+        """
+        if value is None or value == "":
+            return None
+        if value.startswith(f"{settings.UPLOAD_PUBLIC_PREFIX.rstrip('/')}/") or value.startswith(
+            "https://"
+        ):
+            return value
+        raise ValueError("커버 이미지 주소가 올바르지 않습니다.")
 
 
 class PublishResponse(BaseModel):
@@ -45,6 +63,8 @@ class PublishResponse(BaseModel):
     created: bool
     tags: List[str]
     sensitive_findings: int
+    # 호출자가 방금 올린 커버가 실제로 붙었는지 응답만 보고 확인할 수 있어야 한다.
+    cover_url: Optional[str] = None
 
 
 @router.post("", response_model=PublishResponse, status_code=status.HTTP_201_CREATED)
