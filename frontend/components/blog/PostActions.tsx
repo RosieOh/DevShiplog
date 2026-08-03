@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { socialService } from '@/features/social/services/socialService'
 import { useToastStore } from '@/store/toastStore'
-import { AlertIcon, CheckCircleIcon } from '@/components/ui/icons'
+import { AlertIcon, HeartIcon } from '@/components/ui/icons'
 
 interface Props {
   postId: string
@@ -88,17 +88,19 @@ export default function PostActions({
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 border-t border-black/10 pt-8">
+    <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border pt-8">
       <button
         type="button"
         onClick={onLike}
         disabled={busy}
         aria-pressed={liked}
         className={`inline-flex min-h-touch items-center gap-2 rounded-full px-6 font-semibold transition-colors disabled:opacity-60 ${
-          liked ? 'bg-accent text-ink' : 'border border-black/10 bg-surface text-ink hover:bg-canvas'
+          liked
+            ? 'border border-accent-text bg-accent-text text-accent-contrast'
+            : 'border border-border bg-surface text-ink-muted hover:border-ink-faint hover:text-ink'
         }`}
       >
-        <CheckCircleIcon className="h-5 w-5" />
+        <HeartIcon className="h-5 w-5" filled={liked} />
         좋아요 {count}
       </button>
 
@@ -118,14 +120,14 @@ export default function PostActions({
             <div
               role="dialog"
               aria-label="신고 사유 선택"
-              className="absolute right-0 z-20 mt-2 w-56 rounded-2xl border border-black/10 bg-surface p-2 shadow-lg shadow-black/5"
+              className="absolute right-0 z-20 mt-2 w-56 rounded border border-border bg-surface p-2 shadow-lg shadow-card"
             >
               {REPORT_REASONS.map((r) => (
                 <button
                   key={r.value}
                   type="button"
                   onClick={() => onReport(r.value)}
-                  className="flex min-h-touch w-full items-center rounded-xl px-3 text-left text-sm text-ink transition-colors hover:bg-canvas"
+                  className="flex min-h-touch w-full items-center rounded px-3 text-left text-sm text-ink transition-colors hover:bg-bg"
                 >
                   {r.label}
                 </button>
@@ -133,7 +135,7 @@ export default function PostActions({
               <button
                 type="button"
                 onClick={() => setReporting(false)}
-                className="flex min-h-touch w-full items-center rounded-xl px-3 text-left text-sm text-ink-muted transition-colors hover:bg-canvas"
+                className="flex min-h-touch w-full items-center rounded px-3 text-left text-sm text-ink-muted transition-colors hover:bg-bg"
               >
                 취소
               </button>
