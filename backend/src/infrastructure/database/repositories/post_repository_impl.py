@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from src.domain.enums import PostStatus
 from src.infrastructure.database.models.post import Post
 from src.infrastructure.database.models.tag import PostTag, Tag
-from src.infrastructure.database.models.social import Follow
+from src.infrastructure.database.models.social import Follow, PostLike
 from src.infrastructure.database.models.user import User
 from src.ports.output.repositories.post_repository import PostRepository
 
@@ -177,6 +177,40 @@ class PostRepositoryImpl(PostRepository):
             q = q.order_by(Post.published_at.desc())
 
         return q.limit(limit).offset(offset).all()
+
+    def list_recommended(
+        self, user_id: str, limit: int, offset: int, since_days: int = 90
+    ) -> List[Post]:
+        # 내가 좋아요한 글에 달린 태그 = 관심사 신호
+        liked_tags = (
+            select(PostTag.tag_id)
+            .join(PostLike, PostLike.post_id == PostTag.post_id)
+            .where(PostLike.user_id == user_id)
+            .distinct()
+        )
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=since_days)
+
+        return (
+            self.db.query(Post)
+            .options(*_LIST_LOADS)
+            .join(PostTag, PostTag.post_id == Post.id)
+            .filter(
+                Post.status == PostStatus.PUBLISHED,
+                Post.user_id != user_id,
+                Post.published_at >= cutoff,
+                PostTag.tag_id.in_(liked_tags),
+            )
+            .group_by(Post.id)
+            # 겹치는 태그가 많을수록, 반응이 많을수록 위로
+            .order_by(
+                func.count(PostTag.tag_id).desc(),
+                (Post.like_count * 3 + Post.comment_count * 2).desc(),
+                Post.published_at.desc(),
+            )
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
 
     def list_following_feed(self, user_id: str, limit: int, offset: int) -> List[Post]:
         following = select(Follow.following_id).where(Follow.follower_id == user_id)
