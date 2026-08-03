@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 from typing import Optional
 
 from fastapi import Depends, HTTPException, Query, Request, status
@@ -5,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from src.infrastructure.auth.jwt_handler import decode_access_token
+from src.infrastructure.config.settings import settings
 from src.infrastructure.database.repositories.draft_repository_impl import DraftRepositoryImpl
 from src.infrastructure.database.repositories.moderation_repository_impl import (
     BlockRepositoryImpl,
@@ -196,8 +199,25 @@ def client_identity(request: Request, user_id: Optional[str] = None) -> str:
     """레이트리밋 키. 로그인 사용자는 ID, 익명은 IP 기준."""
     if user_id:
         return f"u:{user_id}"
+    return f"ip:{_client_ip(request)}"
+
+
+def _client_ip(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for", "")
-    ip = forwarded.split(",")[0].strip() if forwarded else (
+    return forwarded.split(",")[0].strip() if forwarded else (
         request.client.host if request.client else "unknown"
     )
-    return f"ip:{ip}"
+
+
+def viewer_key(request: Request, user_id: Optional[str] = None) -> str:
+    """조회 중복 제거용 뷰어 식별자.
+
+    IP 를 그대로 저장하지 않는다. 조회수를 세는 데 개인정보가 필요하지 않고,
+    "같은 사람이 다시 왔나" 만 알면 되므로 해시로 충분하다.
+    SECRET_KEY 를 키로 쓴 HMAC 이라 DB 만 새어도 원래 IP 를 되돌릴 수 없다.
+    """
+    if user_id:
+        return hashlib.sha256(f"u:{user_id}".encode()).hexdigest()
+
+    raw = f"{_client_ip(request)}|{request.headers.get('user-agent', '')}"
+    return hmac.new(settings.SECRET_KEY.encode(), raw.encode(), hashlib.sha256).hexdigest()
