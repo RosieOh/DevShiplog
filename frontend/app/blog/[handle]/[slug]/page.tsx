@@ -5,7 +5,10 @@ import Avatar from '@/components/ui/Avatar'
 import Markdown from '@/components/blog/Markdown'
 import PostActions from '@/components/blog/PostActions'
 import CommentSection from '@/components/blog/CommentSection'
-import { formatDate, getPost, SITE_NAME, SITE_URL } from '@/lib/api/public'
+import TableOfContents from '@/components/blog/TableOfContents'
+import FloatingActions from '@/components/blog/FloatingActions'
+import { extractToc } from '@/lib/toc'
+import { absoluteUrl, formatDate, getPost, SITE_NAME, SITE_URL } from '@/lib/api/public'
 
 interface Props {
   params: { handle: string; slug: string }
@@ -54,6 +57,10 @@ export default async function PostPage({ params }: Props) {
 
   if (!post) notFound()
 
+  // 목차는 서버에서 뽑는다. 클라이언트에서 DOM 을 훑으면 첫 페인트에 비어 있고
+  // 크롤러도 읽지 못한다.
+  const toc = extractToc(post.content_md)
+
   // 검색결과에 저자·발행일이 함께 노출되도록 구조화 데이터를 심는다.
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -68,7 +75,8 @@ export default async function PostPage({ params }: Props) {
     },
     publisher: { '@type': 'Organization', name: SITE_NAME },
     mainEntityOfPage: `${SITE_URL}${post.url}`,
-    ...(post.cover_url ? { image: post.cover_url } : {}),
+    // JSON-LD 는 metadataBase 같은 자동 보정이 없다. 크롤러가 쓰려면 절대 주소여야 한다.
+    ...(post.cover_url ? { image: absoluteUrl(post.cover_url) } : {}),
   }
 
   return (
@@ -77,7 +85,14 @@ export default async function PostPage({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <article className="mx-auto max-w-content px-4 py-12 md:px-6">
+      <FloatingActions
+        postId={post.id}
+        initialLiked={post.is_liked}
+        initialLikeCount={post.like_count}
+      />
+
+      <div className="mx-auto grid max-w-shell grid-cols-1 gap-10 px-4 py-12 md:px-6 lg:grid-cols-[minmax(0,1fr)_220px]">
+      <article className="mx-auto w-full max-w-content lg:mx-0">
         <header>
           <h1 className="text-[2rem] font-extrabold leading-[1.3] tracking-tight text-ink text-balance md:text-[2.5rem]">
             {post.title}
@@ -165,6 +180,13 @@ export default async function PostPage({ params }: Props) {
           commentCount={post.comment_count}
         />
       </article>
+
+      {toc.length >= 2 && (
+        <aside className="hidden lg:block">
+          <TableOfContents items={toc} />
+        </aside>
+      )}
+      </div>
     </>
   )
 }
