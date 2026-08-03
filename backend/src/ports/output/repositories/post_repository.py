@@ -84,6 +84,17 @@ class PostRepository(ABC):
         ...
 
     @abstractmethod
+    def list_recommended(
+        self, user_id: str, limit: int, offset: int, since_days: int = 90
+    ) -> List["Post"]:
+        """내가 좋아요한 글의 태그와 겹치는 다른 사람의 글.
+
+        추천이라는 이름을 붙였지만 학습 모델이 아니라 태그 겹침 + 반응 가중치다.
+        신호가 없는 사용자에게는 호출자가 트렌딩으로 대체해야 한다.
+        """
+        ...
+
+    @abstractmethod
     def list_following_feed(
         self, user_id: str, limit: int, offset: int
     ) -> List["Post"]:
