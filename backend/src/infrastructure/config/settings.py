@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     # 사용량 제한 (월간 LLM Job 수). 0 이면 무제한
     MONTHLY_JOB_QUOTA: int = 100
 
+    # 공개 페이지 캐시 무효화 통지 대상 (Next 서버).
+    # 비워두면 통지하지 않고 시간 기반 재검증에만 의존한다.
+    FRONTEND_ORIGIN: str = ""
+    REVALIDATE_SECRET: str = ""
+
     # App
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
