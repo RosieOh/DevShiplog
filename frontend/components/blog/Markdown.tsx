@@ -1,5 +1,6 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeHighlight from 'rehype-highlight'
 import { headingId } from '@/lib/toc'
 
 /**
@@ -44,6 +45,12 @@ export default function Markdown({ children }: { children: string }) {
     <div className="prose max-w-none">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        /*
+         * 문법 강조는 서버에서 끝낸다 (highlight.js 런타임을 브라우저로 보내지 않는다).
+         * detect:false — 언어를 안 적은 블록까지 추측하면 로그·설정 파일이 엉뚱하게 칠해진다.
+         * ignoreMissing:true — 모르는 언어 이름이 와도 예외 대신 그냥 강조를 건너뛴다.
+         */
+        rehypePlugins={[[rehypeHighlight, { detect: false, ignoreMissing: true }]]}
         components={{
           h2: useHeading(2, counters),
           h3: useHeading(3, counters),
