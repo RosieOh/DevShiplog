@@ -59,7 +59,20 @@ const config: Config = {
       },
       minHeight: { touch: '44px' },
       minWidth: { touch: '44px' },
+      /*
+       * h-touch / w-touch 도 쓸 수 있어야 한다.
+       * minHeight 만 정의해 두면 `h-touch` 는 존재하지 않는 클래스라 조용히 무시되고,
+       * 아이콘 버튼이 아이콘 크기(20px)로 쪼그라든다. 실제로 헤더에서 그 일이 났다.
+       */
+      height: { touch: '44px' },
+      width: { touch: '44px' },
       maxWidth: { content: '768px', shell: '1200px' },
+      /*
+       * 셸(1200px) 바깥 여백에 플로팅 바가 들어갈 수 있는 최소 폭.
+       * 1200 + 바 62px + 여백 16px 을 양쪽에 두면 1356px 이고, 여유를 둬 1400 으로 잡았다.
+       * xl(1280px)에서 띄우면 본문 위로 올라탄다.
+       */
+      screens: { wide: '1400px' },
     },
   },
   plugins: [],
