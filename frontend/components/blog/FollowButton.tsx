@@ -62,8 +62,8 @@ export default function FollowButton({ handle }: { handle: string }) {
       aria-pressed={following ?? false}
       className={`inline-flex min-h-touch items-center rounded-full px-6 font-semibold transition-colors disabled:opacity-60 ${
         following
-          ? 'border border-black/10 bg-surface text-ink hover:bg-canvas'
-          : 'bg-accent text-ink'
+          ? 'border border-border bg-surface text-ink hover:bg-bg'
+          : 'bg-ink text-bg'
       }`}
     >
       {following ? '팔로잉' : '팔로우'}
