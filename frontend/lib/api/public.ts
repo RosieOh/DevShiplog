@@ -101,11 +101,21 @@ async function getJson<T>(path: string, options: FetchOptions = {}): Promise<T |
   }
 }
 
+export type FeedSort = 'recent' | 'trending' | 'recommended' | 'following'
+export type FeedPeriod = 'week' | 'month' | 'year' | 'all'
+
 export function getFeed(
-  params: { sort?: 'recent' | 'trending'; tag?: string; limit?: number; offset?: number } = {}
+  params: {
+    sort?: FeedSort
+    period?: FeedPeriod
+    tag?: string
+    limit?: number
+    offset?: number
+  } = {}
 ) {
   const q = new URLSearchParams()
   if (params.sort) q.set('sort', params.sort)
+  if (params.period) q.set('period', params.period)
   if (params.tag) q.set('tag', params.tag)
   q.set('limit', String(params.limit ?? 20))
   q.set('offset', String(params.offset ?? 0))
@@ -170,6 +180,16 @@ export function getRssSource(handle: string) {
     author: Author
     items: { title: string; url: string; summary: string | null; published_at: string | null }[]
   }>(`/blogs/${encodeURIComponent(handle)}/rss`, { tags: [cacheTags.blog(handle)] })
+}
+
+/**
+ * 업로드 주소를 절대 URL 로.
+ *
+ * 백엔드는 '/uploads/...' 상대 경로를 준다(도메인이 바뀌어도 DB 가 안 깨지게).
+ * 하지만 OG 태그·JSON-LD 처럼 남의 서버가 읽는 자리에는 절대 주소가 필요하다.
+ */
+export function absoluteUrl(path: string): string {
+  return /^https?:\/\//.test(path) ? path : `${SITE_URL}${path.startsWith('/') ? '' : '/'}${path}`
 }
 
 /** 날짜를 화면용 문자열로. 서버·클라이언트 렌더 결과가 어긋나지 않도록 UTC 고정. */
