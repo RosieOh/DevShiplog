@@ -6,13 +6,19 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost
 /** 백엔드가 내려주는 오류 본문 */
 interface ApiErrorBody {
   detail?: string
+  [key: string]: unknown
 }
 
 /** 사용자에게 보여줄 메시지를 담은 오류 */
 export class ApiRequestError extends Error {
   constructor(
     message: string,
-    readonly status?: number
+    readonly status?: number,
+    /*
+     * 응답 본문 전체. detail 만으로는 부족한 경우가 있다.
+     * 예: 409 충돌은 "서버의 현재 내용" 을 같이 줘야 사용자가 고를 수 있다.
+     */
+    readonly body?: ApiErrorBody
   ) {
     super(message)
     this.name = 'ApiRequestError'
@@ -21,13 +27,15 @@ export class ApiRequestError extends Error {
 
 function toApiError(error: AxiosError<ApiErrorBody>): ApiRequestError {
   const status = error.response?.status
-  const detail = error.response?.data?.detail
+  const body = error.response?.data
+  const detail = body?.detail
 
-  if (detail) return new ApiRequestError(detail, status)
-  if (status === 429) return new ApiRequestError('사용 한도를 초과했습니다.', status)
-  if (status && status >= 500) return new ApiRequestError('서버 오류가 발생했습니다.', status)
-  if (error.code === 'ECONNABORTED') return new ApiRequestError('요청 시간이 초과되었습니다.', status)
-  return new ApiRequestError(error.message || '요청에 실패했습니다.', status)
+  if (detail) return new ApiRequestError(detail, status, body)
+  if (status === 429) return new ApiRequestError('사용 한도를 초과했습니다.', status, body)
+  if (status && status >= 500) return new ApiRequestError('서버 오류가 발생했습니다.', status, body)
+  if (error.code === 'ECONNABORTED')
+    return new ApiRequestError('요청 시간이 초과되었습니다.', status, body)
+  return new ApiRequestError(error.message || '요청에 실패했습니다.', status, body)
 }
 
 /**
