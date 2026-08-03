@@ -9,6 +9,7 @@ from src.ports.input.api.v1 import (
     profile,
     public,
     safety,
+    series,
     social,
     sources,
     style_profiles,
@@ -39,3 +40,4 @@ api_router.include_router(uploads.router, prefix="/uploads", tags=["uploads"])
 # --- 블로그 플랫폼 ---------------------------------------------------------
 api_router.include_router(posts.router, prefix="/posts", tags=["posts"])
 api_router.include_router(social.router, prefix="/social", tags=["social"])
+api_router.include_router(series.router, prefix="/series", tags=["series"])
