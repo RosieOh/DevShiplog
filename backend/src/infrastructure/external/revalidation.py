@@ -10,6 +10,7 @@
 재검증이 결국 따라잡을 뿐이다.
 """
 
+import json
 import logging
 from typing import Iterable, List, Optional
 
@@ -21,6 +22,9 @@ logger = logging.getLogger(__name__)
 
 TIMEOUT_SECONDS = 3.0
 
+# Next 인스턴스가 구독하는 채널. 인스턴스가 몇 대든 각자 자기 캐시를 깬다.
+CHANNEL = "devshiplog:revalidate"
+
 
 def tags_for_post(handle: Optional[str], slug: Optional[str]) -> List[str]:
     tags = ["feed"]
@@ -31,11 +35,32 @@ def tags_for_post(handle: Optional[str], slug: Optional[str]) -> List[str]:
     return tags
 
 
+def _publish(tag_list: List[str]) -> bool:
+    """Redis 로 팬아웃한다. 성공하면 True.
+
+    HTTP 로 한 곳만 때리면 Next 를 여러 대 띄웠을 때 그 한 대만 캐시가 갱신되고
+    나머지는 낡은 글을 계속 내보낸다. 발행자는 어떤 인스턴스가 몇 대인지 모른다.
+    """
+    try:
+        import redis  # noqa: PLC0415
+
+        client = redis.Redis.from_url(settings.REDIS_URL, socket_timeout=TIMEOUT_SECONDS)
+        client.publish(CHANNEL, json.dumps({"tags": tag_list}))
+        return True
+    except Exception:
+        return False
+
+
 def notify(tags: Iterable[str]) -> None:
     """Next 에 캐시 무효화를 요청한다. 예외를 밖으로 내보내지 않는다."""
     tag_list = [t for t in tags if t]
     if not tag_list:
         return
+
+    # Redis 가 살아 있으면 그걸로 끝. 실패하면 단일 인스턴스용 HTTP 통지로 내려간다.
+    if _publish(tag_list):
+        return
+
     if not settings.FRONTEND_ORIGIN or not settings.REVALIDATE_SECRET:
         # 로컬/테스트에서는 설정하지 않고 쓸 수 있어야 한다.
         return
