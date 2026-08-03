@@ -2,13 +2,11 @@ from sqlalchemy import Column, String, ForeignKey, DateTime, Enum, Text, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
-import enum
-from infrastructure.database.session import Base
 
+from src.domain.enums import SourceType
+from src.infrastructure.database.session import Base
 
-class SourceType(str, enum.Enum):
-    URL = "url"
-    RAW = "raw"
+__all__ = ["Source", "SourceType"]
 
 
 class Source(Base):
@@ -26,4 +24,3 @@ class Source(Base):
 
     # Relationships
     user = relationship("User", back_populates="sources")
-
