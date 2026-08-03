@@ -4,6 +4,7 @@ from typing import List, Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from src.application.errors import StaleDraftError
 from src.domain.enums import DraftStatus
 from src.infrastructure.database.models.draft import Draft
 from src.infrastructure.database.models.draft_version import DraftVersion
@@ -71,12 +72,24 @@ class DraftRepositoryImpl(DraftRepository):
         version_id: str,
         content_md: str,
         meta_json: Optional[dict] = None,
+        expected_revision: Optional[int] = None,
     ) -> DraftVersion:
+        """자동저장. expected_revision 을 주면 낙관적 잠금이 걸린다.
+
+        두 탭에서 같은 글을 열면 나중에 저장한 쪽이 앞의 내용을 조용히 덮어쓴다.
+        마지막으로 읽은 revision 을 같이 보내게 하고, 그 사이에 누가 저장했으면
+        거절한다. 조용히 잃는 것보다 알고 고르는 편이 낫다.
+        """
         version = self.get_version_by_id(version_id)
         if not version:
             raise ValueError(f"DraftVersion {version_id} not found")
 
+        current = version.revision or 1
+        if expected_revision is not None and expected_revision != current:
+            raise StaleDraftError(current_revision=current, content_md=version.content_md or "")
+
         version.content_md = content_md
+        version.revision = current + 1
         if meta_json is not None:
             version.meta_json = meta_json
 
