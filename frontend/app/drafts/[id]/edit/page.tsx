@@ -1,19 +1,26 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { draftService, Draft } from '@/features/drafts/services/draftService'
+import { draftService, Draft, DraftVersion } from '@/features/drafts/services/draftService'
 import { safetyService, RiskFinding } from '@/features/safety/services/safetyService'
+import { useJobStatus } from '@/features/drafts/hooks/useJobStatus'
 import { useToastStore } from '@/store/toastStore'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import Link from 'next/link'
 
+const AUTOSAVE_DELAY_MS = 2000
+
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error ? err.message : fallback
+}
+
 export default function DraftEditPage() {
   const params = useParams()
   const router = useRouter()
-  const { data: session } = useSession()
+  const { status: sessionStatus } = useSession()
   const { addToast } = useToastStore()
   const draftId = params.id as string
 
@@ -24,134 +31,141 @@ export default function DraftEditPage() {
   const [loading, setLoading] = useState(true)
   const [scanning, setScanning] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [transforming, setTransforming] = useState(false)
-  const [versions, setVersions] = useState<any[]>([])
+  const [snapshotting, setSnapshotting] = useState(false)
+  const [transformJobId, setTransformJobId] = useState<string | null>(null)
+  const [versions, setVersions] = useState<DraftVersion[]>([])
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
+  // 서버에 저장된 최신 내용. 이 값과 같으면 자동저장을 건너뛴다.
+  const savedContentRef = useRef<string>('')
+
+  const { jobStatus: transformJob } = useJobStatus(transformJobId)
+
+  const loadDraft = useCallback(async () => {
+    try {
+      const loadedDraft = await draftService.get(draftId)
+      setDraft(loadedDraft)
+      const loadedContent = loadedDraft.latest_version?.content_md || ''
+      setContent(loadedContent)
+      savedContentRef.current = loadedContent
+      setVersions(await draftService.getVersions(draftId))
+    } catch (err) {
+      addToast({ message: errorMessage(err, 'Draft 를 불러오지 못했습니다.'), type: 'error' })
+    }
+  }, [draftId, addToast])
 
   useEffect(() => {
-    if (!session) {
+    if (sessionStatus === 'loading') return
+    if (sessionStatus === 'unauthenticated') {
       router.push('/auth/login')
       return
     }
-    loadDraft()
-  }, [draftId, session, router])
+    void loadDraft().finally(() => setLoading(false))
+  }, [sessionStatus, router, loadDraft])
+
+  const saveContent = useCallback(
+    async (silent: boolean) => {
+      if (content === savedContentRef.current) {
+        if (!silent) addToast({ message: '변경사항이 없습니다.', type: 'info' })
+        return
+      }
+      try {
+        setSaving(true)
+        // 자동저장은 새 버전을 만들지 않고 최신 버전을 제자리에서 수정한다.
+        await draftService.saveContent(draftId, {
+          content_md: content,
+          meta_json: draft?.latest_version?.meta_json ?? null,
+        })
+        savedContentRef.current = content
+        setLastSavedAt(new Date())
+        if (!silent) addToast({ message: '저장되었습니다.', type: 'success' })
+      } catch (err) {
+        addToast({ message: errorMessage(err, '저장에 실패했습니다.'), type: 'error' })
+      } finally {
+        setSaving(false)
+      }
+    },
+    [content, draftId, draft, addToast]
+  )
 
   // 자동 저장 (debounce)
   useEffect(() => {
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current)
-    }
+    if (loading || !draft) return
 
-    autoSaveTimerRef.current = setTimeout(() => {
-      if (content && draft) {
-        handleSave(true) // silent save
-      }
-    }, 2000) // 2초 후 자동 저장
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+    autoSaveTimerRef.current = setTimeout(() => void saveContent(true), AUTOSAVE_DELAY_MS)
 
     return () => {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current)
-      }
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
     }
-  }, [content])
+  }, [content, loading, draft, saveContent])
 
-  const loadDraft = async () => {
+  /** 되돌리기 지점을 남기는 명시적 버전 저장 */
+  const handleCreateSnapshot = async () => {
     try {
-      setLoading(true)
-      const loadedDraft = await draftService.get(draftId)
-      setDraft(loadedDraft)
-      setContent(loadedDraft.latest_version?.content_md || '')
-      // 버전 목록도 로드
-      const versionsData = await draftService.getVersions?.(draftId) || []
-      setVersions(versionsData)
-    } catch (err: any) {
-      addToast({
-        message: `Draft 로드 실패: ${err.message}`,
-        type: 'error',
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSave = async (silent = false) => {
-    try {
-      setSaving(true)
-      await draftService.updateVersion(draftId, {
+      setSnapshotting(true)
+      await saveContent(true)
+      const version = await draftService.createVersion(draftId, {
         content_md: content,
-        meta_json: draft?.latest_version?.meta_json || {},
+        meta_json: draft?.latest_version?.meta_json ?? null,
       })
-      if (!silent) {
-        addToast({
-          message: '저장되었습니다.',
-          type: 'success',
-        })
-      }
+      addToast({ message: `버전 ${version.version_no} 으로 저장했습니다.`, type: 'success' })
       await loadDraft()
-    } catch (err: any) {
-      addToast({
-        message: `저장 실패: ${err.message}`,
-        type: 'error',
-      })
+    } catch (err) {
+      addToast({ message: errorMessage(err, '버전 저장에 실패했습니다.'), type: 'error' })
     } finally {
-      setSaving(false)
+      setSnapshotting(false)
     }
   }
 
   const handleTransform = async (transformType: string) => {
     try {
-      setTransforming(true)
-      const result = await draftService.transform(draftId, {
-        transform_type: transformType,
-        user_id: session?.user?.id || '',
-      })
-      addToast({
-        message: '변형이 시작되었습니다. 잠시 후 새 버전이 생성됩니다.',
-        type: 'info',
-      })
-      // Job 상태 확인 후 새 버전 로드
-      setTimeout(() => {
-        loadDraft()
-      }, 3000)
-    } catch (err: any) {
-      addToast({
-        message: `변형 실패: ${err.message}`,
-        type: 'error',
-      })
-    } finally {
-      setTransforming(false)
+      const result = await draftService.transform(draftId, { transform_type: transformType })
+      setTransformJobId(result.job_id)
+      addToast({ message: '변형을 시작했습니다. 완료되면 자동으로 반영됩니다.', type: 'info' })
+    } catch (err) {
+      addToast({ message: errorMessage(err, '변형에 실패했습니다.'), type: 'error' })
     }
   }
 
-  const handleScan = async () => {
+  // 변형 Job 이 끝나면 결과를 반영한다 (고정 3초 대기 대신 실제 상태를 본다).
+  useEffect(() => {
+    if (!transformJob) return
+    if (transformJob.status === 'succeeded') {
+      setTransformJobId(null)
+      addToast({ message: '변형이 완료되었습니다.', type: 'success' })
+      void loadDraft()
+    } else if (transformJob.status === 'failed') {
+      setTransformJobId(null)
+      addToast({ message: transformJob.error_text || '변형에 실패했습니다.', type: 'error' })
+    }
+  }, [transformJob, loadDraft, addToast])
+
+  const handleScan = useCallback(async () => {
     try {
       setScanning(true)
       const result = await safetyService.scan(draftId)
       setFindings(result.findings)
-    } catch (err: any) {
-      addToast({
-        message: `Safety 검사 실패: ${err.message}`,
-        type: 'error',
-      })
+      if (result.count === 0) {
+        addToast({ message: '민감정보가 발견되지 않았습니다.', type: 'success' })
+      }
+    } catch (err) {
+      addToast({ message: errorMessage(err, 'Safety 검사에 실패했습니다.'), type: 'error' })
     } finally {
       setScanning(false)
     }
-  }
+  }, [draftId, addToast])
 
   const handleApplyFix = async (findingId: string, action: 'mask' | 'delete' | 'ignore') => {
     try {
-      await safetyService.applyFix(draftId, { finding_id: findingId, action })
+      // 편집 중인 내용이 서버에 반영돼 있어야 오프셋이 맞는다.
+      await saveContent(true)
+      const result = await safetyService.applyFix(draftId, { finding_id: findingId, action })
       await loadDraft()
       await handleScan()
-      addToast({
-        message: '적용되었습니다.',
-        type: 'success',
-      })
-    } catch (err: any) {
-      addToast({
-        message: `적용 실패: ${err.message}`,
-        type: 'error',
-      })
+      addToast({ message: result.message, type: 'success' })
+    } catch (err) {
+      addToast({ message: errorMessage(err, '적용에 실패했습니다.'), type: 'error' })
     }
   }
 
@@ -176,11 +190,8 @@ export default function DraftEditPage() {
         message: '다운로드되었습니다.',
         type: 'success',
       })
-    } catch (err: any) {
-      addToast({
-        message: `다운로드 실패: ${err.message}`,
-        type: 'error',
-      })
+    } catch (err) {
+      addToast({ message: errorMessage(err, '다운로드에 실패했습니다.'), type: 'error' })
     }
   }
 
@@ -218,13 +229,30 @@ export default function DraftEditPage() {
             </Link>
             <h1 className="text-5xl font-bold text-[#111111] tracking-tight">Draft 편집</h1>
           </div>
-          <button
-            onClick={() => handleSave(false)}
-            disabled={saving}
-            className="px-6 py-3 bg-[#d1fb52] text-black rounded-full hover:scale-105 transition-transform font-semibold disabled:bg-gray-300"
-          >
-            {saving ? '저장 중...' : '저장'}
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-[#666666]">
+              {saving
+                ? '저장 중...'
+                : lastSavedAt
+                  ? `${lastSavedAt.toLocaleTimeString('ko-KR')} 자동저장됨`
+                  : '자동저장 대기 중'}
+            </span>
+            <button
+              onClick={() => void saveContent(false)}
+              disabled={saving}
+              className="px-6 py-3 bg-white border border-black/10 text-[#111111] rounded-full hover:bg-[#f9f9f7] transition-colors font-semibold disabled:opacity-50"
+            >
+              저장
+            </button>
+            <button
+              onClick={handleCreateSnapshot}
+              disabled={snapshotting}
+              title="현재 내용을 되돌리기 지점으로 남깁니다"
+              className="px-6 py-3 bg-[#d1fb52] text-black rounded-full hover:scale-105 transition-transform font-semibold disabled:bg-gray-300"
+            >
+              {snapshotting ? '저장 중...' : '버전 남기기'}
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -312,7 +340,7 @@ export default function DraftEditPage() {
             <div className="grid md:grid-cols-2 gap-4">
               <button
                 onClick={() => handleTransform('shorten')}
-                disabled={transforming}
+                disabled={Boolean(transformJobId)}
                 className="p-6 bg-[#f9f9f7] rounded-2xl border border-black/10 hover:bg-[#d1fb52] hover:border-[#d1fb52] transition-colors disabled:opacity-50"
               >
                 <h3 className="font-bold text-lg text-[#111111] mb-2">더 짧게</h3>
@@ -320,7 +348,7 @@ export default function DraftEditPage() {
               </button>
               <button
                 onClick={() => handleTransform('expand')}
-                disabled={transforming}
+                disabled={Boolean(transformJobId)}
                 className="p-6 bg-[#f9f9f7] rounded-2xl border border-black/10 hover:bg-[#d1fb52] hover:border-[#d1fb52] transition-colors disabled:opacity-50"
               >
                 <h3 className="font-bold text-lg text-[#111111] mb-2">더 길게</h3>
@@ -328,7 +356,7 @@ export default function DraftEditPage() {
               </button>
               <button
                 onClick={() => handleTransform('simplify')}
-                disabled={transforming}
+                disabled={Boolean(transformJobId)}
                 className="p-6 bg-[#f9f9f7] rounded-2xl border border-black/10 hover:bg-[#d1fb52] hover:border-[#d1fb52] transition-colors disabled:opacity-50"
               >
                 <h3 className="font-bold text-lg text-[#111111] mb-2">쉽게</h3>
@@ -336,7 +364,7 @@ export default function DraftEditPage() {
               </button>
               <button
                 onClick={() => handleTransform('deepen')}
-                disabled={transforming}
+                disabled={Boolean(transformJobId)}
                 className="p-6 bg-[#f9f9f7] rounded-2xl border border-black/10 hover:bg-[#d1fb52] hover:border-[#d1fb52] transition-colors disabled:opacity-50"
               >
                 <h3 className="font-bold text-lg text-[#111111] mb-2">더 딥하게</h3>
@@ -366,7 +394,9 @@ export default function DraftEditPage() {
                           버전 {version.version_no}
                         </h3>
                         <p className="text-sm text-[#666666]">
-                          {new Date(version.created_at).toLocaleString('ko-KR')}
+                          {version.created_at
+                            ? new Date(version.created_at).toLocaleString('ko-KR')
+                            : '-'}
                         </p>
                       </div>
                       {index === 0 && (
