@@ -152,6 +152,75 @@ body {
   @apply bg-transparent p-0 text-inherit;
 }
 
+/*
+ * 코드 문법 강조 (rehype-highlight → highlight.js 클래스).
+ *
+ * highlight.js 기본 테마 CSS 를 가져오지 않고 직접 쓴다. 배포본 테마는 배경색까지
+ * 같이 정해 버려서 위의 .prose pre 배경과 충돌한다. 색은 Open Color 에서 골랐고,
+ * 코드 배경(#212529) 위에서 전부 4.5:1 이상이 나오는 값들이다.
+ *
+ * 코드블록은 라이트/다크 모두 어두운 배경을 쓴다. 밝은 배경으로 뒤집으면 본문과
+ * 구분이 사라져서, 어디까지가 코드인지 훑어볼 때 안 보인다.
+ */
+.hljs-comment,
+.hljs-quote {
+  @apply italic text-[#adb5bd];
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-type {
+  @apply text-[#ffa8a8];
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute {
+  @apply text-[#8ce99a];
+}
+
+.hljs-number,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-built_in,
+.hljs-symbol {
+  @apply text-[#ffd43b];
+}
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-section,
+.hljs-name {
+  @apply text-[#74c0fc];
+}
+
+.hljs-attr,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id,
+.hljs-property {
+  @apply text-[#d0bfff];
+}
+
+.hljs-meta,
+.hljs-doctag {
+  @apply text-[#99e9f2];
+}
+
+.hljs-deletion {
+  @apply text-[#ffc9c9];
+}
+
+.hljs-emphasis {
+  @apply italic;
+}
+
+.hljs-strong {
+  @apply font-bold;
+}
+
 .prose ul {
   @apply list-disc pl-6;
 }
