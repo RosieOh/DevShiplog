@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { draftService, Draft } from '@/features/drafts/services/draftService'
@@ -12,6 +12,25 @@ interface UsageStats {
   this_month: number
   total: number
   this_week: number
+  monthly_quota: number
+  /** 무제한이면 -1 */
+  remaining: number
+  cost_usd_this_month: number
+}
+
+const EMPTY_USAGE: UsageStats = {
+  this_month: 0,
+  total: 0,
+  this_week: 0,
+  monthly_quota: 0,
+  remaining: -1,
+  cost_usd_this_month: 0,
+}
+
+/** meta_json 은 임의 JSON 이라 title 이 문자열이라는 보장이 없다. */
+function draftTitle(draft: Draft): string {
+  const title = draft.latest_version?.meta_json?.title
+  return typeof title === 'string' && title.trim() ? title : '제목 없음'
 }
 
 export default function DashboardPage() {
@@ -20,20 +39,9 @@ export default function DashboardPage() {
   const { addToast } = useToastStore()
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [loading, setLoading] = useState(true)
-  const [usageStats, setUsageStats] = useState<UsageStats>({ this_month: 0, total: 0, this_week: 0 })
+  const [usageStats, setUsageStats] = useState<UsageStats>(EMPTY_USAGE)
 
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/login')
-      return
-    }
-
-    if (status === 'authenticated') {
-      loadData()
-    }
-  }, [status, router])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       const [draftsData, statsData] = await Promise.all([
@@ -42,15 +50,26 @@ export default function DashboardPage() {
       ])
       setDrafts(draftsData)
       setUsageStats(statsData)
-    } catch (error: any) {
+    } catch (error) {
       addToast({
-        message: '데이터를 불러오는데 실패했습니다.',
+        message: error instanceof Error ? error.message : '데이터를 불러오는데 실패했습니다.',
         type: 'error',
       })
     } finally {
       setLoading(false)
     }
-  }
+  }, [addToast])
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/login')
+      return
+    }
+
+    if (status === 'authenticated') {
+      void loadData()
+    }
+  }, [status, router, loadData])
 
   return (
     <div className="bg-[#f9f9f7] min-h-screen">
@@ -155,7 +174,7 @@ export default function DashboardPage() {
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-bold text-xl text-[#111111] mb-2">
-                        {draft.latest_version?.meta_json?.title || '제목 없음'}
+                        {draftTitle(draft)}
                       </h3>
                       <p className="text-sm text-[#666666]">
                         {draft.type} · {draft.audience} · {draft.length_preset}
