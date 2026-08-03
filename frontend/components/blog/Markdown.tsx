@@ -29,7 +29,7 @@ export default function Markdown({ children }: { children: string }) {
           // eslint-disable-next-line @next/next/no-img-element
           img: ({ src, alt }) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={src} alt={alt ?? ''} loading="lazy" className="rounded-2xl max-w-full h-auto" />
+            <img src={src} alt={alt ?? ''} loading="lazy" className="rounded max-w-full h-auto" />
           ),
         }}
       >
