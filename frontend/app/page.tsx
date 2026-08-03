@@ -401,8 +401,8 @@ export default function Home() {
             <div className="bg-white p-8 rounded-[32px] border border-black/5">
               <h3 className="text-xl font-bold mb-3 text-[#111111]">생성된 초안을 수정할 수 있나요?</h3>
               <p className="text-[#666666] leading-relaxed">
-                네, 마크다운 에디터에서 자유롭게 수정할 수 있습니다. 또한 "더 짧게", "더 길게", "쉽게", 
-                "더 딥하게" 등의 변형 기능을 사용하여 원하는 방향으로 조정할 수 있습니다.
+                네, 마크다운 에디터에서 자유롭게 수정할 수 있습니다. 또한 &quot;더 짧게&quot;, &quot;더 길게&quot;, &quot;쉽게&quot;, 
+                &quot;더 딥하게&quot; 등의 변형 기능을 사용하여 원하는 방향으로 조정할 수 있습니다.
               </p>
             </div>
 
