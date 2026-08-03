@@ -3,18 +3,23 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { styleProfileService } from '@/features/style-profiles/services/styleProfileService'
+import {
+  styleProfileService,
+  StyleProfileResponse,
+} from '@/features/style-profiles/services/styleProfileService'
 import { useToastStore } from '@/store/toastStore'
 import Link from 'next/link'
 
+const POLL_INTERVAL_MS = 3000
+
 export default function StyleOnboardingPage() {
   const router = useRouter()
-  const { data: session, status } = useSession()
+  const { status } = useSession()
   const { addToast } = useToastStore()
   const [blogUrl, setBlogUrl] = useState('')
   const [sampleCount, setSampleCount] = useState(5)
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<StyleProfileResponse | null>(null)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -22,43 +27,56 @@ export default function StyleOnboardingPage() {
     }
   }, [status, router])
 
-  const handleAnalyze = async () => {
-    if (!session?.user?.id) {
-      addToast({
-        message: '로그인이 필요합니다.',
-        type: 'error',
-      })
-      return
-    }
+  // 분석이 끝날 때까지 상태를 폴링한다 (기존에는 시작만 알리고 끝났다).
+  useEffect(() => {
+    if (!result || result.status === 'succeeded' || result.status === 'failed') return
 
+    const timer = setInterval(async () => {
+      try {
+        const latest = await styleProfileService.get(result.id)
+        setResult(latest)
+        if (latest.status === 'succeeded') {
+          addToast({ message: 'Style DNA 분석이 완료되었습니다.', type: 'success' })
+        } else if (latest.status === 'failed') {
+          addToast({ message: latest.error_text || '분석에 실패했습니다.', type: 'error' })
+        }
+      } catch {
+        // 일시적 오류는 다음 폴링에서 다시 시도한다.
+      }
+    }, POLL_INTERVAL_MS)
+
+    return () => clearInterval(timer)
+  }, [result, addToast])
+
+  const handleAnalyze = async () => {
     if (!blogUrl.trim()) {
-      addToast({
-        message: '블로그 주소를 입력해주세요.',
-        type: 'error',
-      })
+      addToast({ message: '블로그 주소를 입력해주세요.', type: 'error' })
       return
     }
 
     try {
       setLoading(true)
       const profile = await styleProfileService.create({
-        blog_url: blogUrl,
+        blog_url: blogUrl.trim(),
         sample_count: sampleCount,
-        user_id: session.user.id,
       })
       setResult(profile)
+      addToast({ message: 'Style DNA 생성이 시작되었습니다.', type: 'success' })
+    } catch (err) {
       addToast({
-        message: 'Style DNA 생성이 시작되었습니다.',
-        type: 'success',
-      })
-    } catch (err: any) {
-      addToast({
-        message: `Style DNA 생성 실패: ${err.message}`,
+        message: err instanceof Error ? err.message : 'Style DNA 생성에 실패했습니다.',
         type: 'error',
       })
     } finally {
       setLoading(false)
     }
+  }
+
+  const statusLabel: Record<StyleProfileResponse['status'], string> = {
+    queued: '대기 중',
+    running: '분석 중',
+    succeeded: '완료',
+    failed: '실패',
   }
 
   return (
@@ -138,12 +156,22 @@ export default function StyleOnboardingPage() {
                       </svg>
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-bold text-black mb-3 text-xl">Style DNA 생성이 시작되었습니다!</h3>
+                      <h3 className="font-bold text-black mb-3 text-xl">
+                        {result.status === 'succeeded'
+                          ? 'Style DNA가 완성되었습니다!'
+                          : result.status === 'failed'
+                            ? '분석에 실패했습니다'
+                            : 'Style DNA를 분석하고 있습니다'}
+                      </h3>
                       <p className="text-[#111111] mb-6">
-                        분석이 완료되면 대시보드에서 확인할 수 있습니다.
+                        {result.status === 'succeeded'
+                          ? '이제 새 글을 만들 때 이 스타일을 선택할 수 있습니다.'
+                          : result.status === 'failed'
+                            ? result.error_text || '블로그 주소를 다시 확인해주세요.'
+                            : '보통 1~2분 정도 걸립니다. 이 페이지를 열어두면 자동으로 갱신됩니다.'}
                       </p>
                       <div className="space-y-2 text-sm text-[#111111] mb-6">
-                        <p><strong>상태:</strong> {result.status}</p>
+                        <p><strong>상태:</strong> {statusLabel[result.status]}</p>
                         <p><strong>Profile ID:</strong> {result.id}</p>
                       </div>
                       <Link
