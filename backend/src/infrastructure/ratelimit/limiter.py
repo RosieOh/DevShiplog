@@ -32,6 +32,7 @@ RULES = {
     "follow": Rule(limit=60, window_seconds=3600),
     "like": Rule(limit=120, window_seconds=60),
     "report": Rule(limit=20, window_seconds=3600),
+    "upload": Rule(limit=30, window_seconds=3600),
     "signup": Rule(limit=10, window_seconds=3600),
     "login": Rule(limit=20, window_seconds=300),
 }
