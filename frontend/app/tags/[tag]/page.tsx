@@ -24,9 +24,9 @@ export default async function TagPage({ params }: Props) {
   const posts = feed?.items ?? []
 
   return (
-    <div className="bg-canvas min-h-screen">
+    <div className="bg-bg min-h-screen">
       <div className="mx-auto max-w-[820px] px-[5%] py-12">
-        <header className="border-b border-black/10 pb-8">
+        <header className="border-b border-border pb-8">
           <h1 className="text-4xl font-bold tracking-tight text-ink">#{tag}</h1>
           <p className="mt-2 text-ink-muted">{posts.length}개의 글</p>
         </header>
