@@ -42,8 +42,12 @@ class DraftRepository(ABC):
         version_id: str,
         content_md: str,
         meta_json: Optional[dict] = None,
+        expected_revision: Optional[int] = None,
     ) -> "DraftVersion":
-        """기존 버전을 제자리에서 수정한다 (자동저장용 — 새 버전을 만들지 않음)."""
+        """기존 버전을 제자리에서 수정한다 (자동저장용 — 새 버전을 만들지 않음).
+
+        expected_revision 을 주면 그 사이에 다른 저장이 있었을 때 StaleDraftError.
+        """
         ...
 
     @abstractmethod
