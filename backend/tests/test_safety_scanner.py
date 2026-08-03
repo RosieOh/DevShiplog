@@ -30,6 +30,11 @@ def categories(findings):
         ("담당자 kim.chulsoo@mycompany.co.kr 로 문의", "email"),
         ("서버는 http://192.168.0.14:8080/admin 에서 확인", "internal_url"),
         ("https://db.internal/status 를 확인", "internal_url"),
+        # 기술 글에는 http 아닌 스킴이 그대로 붙여넣기 된다.
+        ("접속 정보는 redis://10.0.3.14:6379 였다", "internal_url"),
+        ("postgres://user:pw@172.20.5.9:5432/app 로 연결", "internal_url"),
+        # 스킴 없이 적힌 사설 IP 도 내부 토폴로지를 노출한다.
+        ("10.0.3.14:6379 로 붙었더니 timeout", "internal_url"),
     ],
 )
 def test_detects_sensitive_values(scanner, content, expected):
@@ -84,6 +89,17 @@ def test_plain_numbers_are_not_phone_numbers(scanner):
 
 def test_public_url_is_not_internal(scanner):
     assert scanner.scan("https://github.com/anthropics/claude-code 참고") == []
+
+
+def test_bare_localhost_is_not_flagged(scanner):
+    """개발 글에 localhost 는 수없이 나오고 유출 가치도 없다. 스킴이 붙은 경우만 잡는다."""
+    assert scanner.scan("localhost 에서 먼저 확인해보세요") == []
+    assert scanner.scan("포트 3000 번으로 띄우면 됩니다") == []
+
+
+def test_public_ip_is_not_flagged(scanner):
+    """사설 대역이 아니면 내부 주소가 아니다."""
+    assert scanner.scan("8.8.8.8 로 확인했다") == []
 
 
 # ------------------------------------------------------------------ 위치/중복
