@@ -69,14 +69,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="bg-[#f9f9f7] min-h-screen flex items-center justify-center px-[5%]">
+    <div className="bg-canvas min-h-screen flex items-center justify-center px-[5%]">
       <div className="max-w-md w-full">
-        <div className="bg-white rounded-[32px] border border-black/5 p-10">
+        <div className="bg-surface rounded-[32px] border border-black/5 p-10">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-[#111111] mb-3 tracking-tight">
+            <h1 className="text-4xl font-bold text-ink mb-3 tracking-tight">
               {isSignUp ? '회원가입' : '로그인'}
             </h1>
-            <p className="text-[#666666]">
+            <p className="text-ink-muted">
               {isSignUp ? '새 계정을 만들어 시작하세요' : 'Devshiplog에 오신 것을 환영합니다'}
             </p>
           </div>
@@ -84,46 +84,54 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {isSignUp && (
               <div>
-                <label className="block text-sm font-semibold text-[#111111] mb-2">
+                <label htmlFor="signup-name" className="block text-sm font-semibold text-ink mb-2">
                   이름
                 </label>
                 <input
+                  id="signup-name"
+                  name="name"
+                  autoComplete="name"
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  className="w-full p-4 border border-black/10 rounded-2xl focus:ring-2 focus:ring-[#d1fb52] focus:border-transparent bg-[#f9f9f7]"
+                  className="w-full p-4 border border-black/10 rounded-2xl bg-canvas"
                   placeholder="이름을 입력하세요"
                 />
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-semibold text-[#111111] mb-2">
+              <label htmlFor="auth-email" className="block text-sm font-semibold text-ink mb-2">
                 이메일
               </label>
               <input
+                id="auth-email"
+                name="email"
+                autoComplete="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full p-4 border border-black/10 rounded-2xl focus:ring-2 focus:ring-[#d1fb52] focus:border-transparent bg-[#f9f9f7]"
+                className="w-full p-4 border border-black/10 rounded-2xl bg-canvas"
                 placeholder="email@example.com"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-[#111111] mb-2">
+              <label htmlFor="auth-password" className="block text-sm font-semibold text-ink mb-2">
                 비밀번호
               </label>
               <input
+                id="auth-password"
+                name="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 // 백엔드 회원가입 정책과 동일하게 8자 이상
                 minLength={isSignUp ? 8 : undefined}
-                className="w-full p-4 border border-black/10 rounded-2xl focus:ring-2 focus:ring-[#d1fb52] focus:border-transparent bg-[#f9f9f7]"
+                className="w-full p-4 border border-black/10 rounded-2xl bg-canvas"
                 placeholder={isSignUp ? '8자 이상 입력하세요' : '비밀번호를 입력하세요'}
               />
             </div>
@@ -137,7 +145,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-8 py-5 bg-[#d1fb52] text-black rounded-full hover:scale-105 transition-transform font-semibold text-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="w-full px-8 py-5 bg-accent text-ink rounded-full motion-safe:hover:scale-105 transition-transform font-semibold text-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
               {loading ? '처리 중...' : isSignUp ? '회원가입' : '로그인'}
             </button>
@@ -149,7 +157,7 @@ export default function LoginPage() {
                 setIsSignUp(!isSignUp)
                 setError('')
               }}
-              className="text-[#666666] hover:text-[#111111] transition-colors text-sm"
+              className="inline-flex items-center min-h-touch px-2 text-ink-muted hover:text-ink transition-colors text-sm"
             >
               {isSignUp ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}
             </button>
@@ -158,7 +166,7 @@ export default function LoginPage() {
           <div className="mt-8 pt-8 border-t border-black/10">
             <Link
               href="/"
-              className="block text-center text-[#666666] hover:text-[#111111] transition-colors text-sm"
+              className="flex items-center justify-center min-h-touch text-ink-muted hover:text-ink transition-colors text-sm"
             >
               ← 홈으로 돌아가기
             </Link>
