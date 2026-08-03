@@ -30,6 +30,18 @@ const nextConfig = {
         source: '/api/v1/:path*',
         destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/:path*`,
       },
+      {
+        /*
+         * 업로드된 이미지.
+         *
+         * 백엔드는 커버/아바타 주소를 '/uploads/...' 같은 상대 경로로 돌려준다.
+         * 도메인을 박아 두면 환경이 바뀔 때마다 DB 에 남은 주소가 전부 깨지기 때문이다.
+         * 대신 브라우저가 그 경로를 프론트 도메인에서 찾으므로 여기서 넘겨줘야 한다.
+         * (S3 로 옮기면 절대 URL 이 내려오고 이 규칙은 그냥 안 타게 된다.)
+         */
+        source: '/uploads/:path*',
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/uploads/:path*`,
+      },
     ]
   },
 }
