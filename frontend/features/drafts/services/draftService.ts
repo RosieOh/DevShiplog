@@ -22,6 +22,8 @@ export interface DraftVersion {
   meta_json: Record<string, unknown> | null
   created_at: string | null
   updated_at: string | null
+  /** 저장할 때마다 오른다. 다음 저장에 base_revision 으로 되돌려 보낸다. */
+  revision?: number
 }
 
 export interface Draft {
@@ -41,6 +43,8 @@ export interface TransformDraftRequest {
 export interface SaveContentRequest {
   content_md: string
   meta_json?: Record<string, unknown> | null
+  /** 내가 마지막으로 읽은 revision. 그 사이에 다른 저장이 있었으면 서버가 409 를 낸다. */
+  base_revision?: number
 }
 
 export const draftService = {
