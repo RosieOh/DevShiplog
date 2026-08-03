@@ -1,6 +1,6 @@
 from typing import Any, Dict, List
 
-from src.application.errors import NotFoundError, PermissionDeniedError
+from src.application.errors import NotFoundError
 from src.domain.services.safety_scanner import SafetyScanner
 from src.ports.output.repositories.draft_repository import DraftRepository
 from src.ports.output.repositories.risk_finding_repository import RiskFindingRepository
@@ -21,8 +21,10 @@ class ScanDraftUseCase:
         draft = self.draft_repo.get_by_id(draft_id)
         if not draft:
             raise NotFoundError("Draft 를 찾을 수 없습니다.")
+        # 소유권 불일치도 404 로 답한다. 403 은 "그 Draft 는 존재한다" 를 알려주는 셈이라
+        # guards.get_owned_draft 와 동작이 달라지고 존재 여부가 새어나간다.
         if draft.user_id != user_id:
-            raise PermissionDeniedError("이 Draft 에 접근할 수 없습니다.")
+            raise NotFoundError("Draft 를 찾을 수 없습니다.")
 
         latest_version = self.draft_repo.get_latest_version(draft_id)
         if not latest_version:
