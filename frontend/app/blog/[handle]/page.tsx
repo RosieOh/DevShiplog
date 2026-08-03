@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import Avatar from '@/components/ui/Avatar'
 import PostCard from '@/components/blog/PostCard'
 import FollowButton from '@/components/blog/FollowButton'
 import { getBlog, getBlogPosts, SITE_NAME, SITE_URL } from '@/lib/api/public'
@@ -33,65 +34,78 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function BlogHomePage({ params }: Props) {
   const handle = decodeURIComponent(params.handle)
-  const [blog, posts] = await Promise.all([getBlog(handle), getBlogPosts(handle)])
+  const [blog, posts] = await Promise.all([getBlog(handle), getBlogPosts(handle, 24)])
 
   if (!blog) notFound()
 
   return (
-    <div className="bg-canvas min-h-screen">
-      <div className="mx-auto max-w-[820px] px-[5%] py-12">
-        <header className="border-b border-black/10 pb-10">
-          <div className="flex flex-wrap items-start justify-between gap-6">
-            <div>
-              <h1 className="text-4xl font-bold tracking-tight text-ink">{blog.display_name}</h1>
-              <p className="mt-1 text-ink-muted">@{blog.handle}</p>
-              {blog.bio && <p className="mt-4 max-w-prose leading-relaxed text-ink">{blog.bio}</p>}
-              <dl className="mt-5 flex gap-6 text-sm text-ink-muted">
-                <div className="flex gap-1.5">
-                  <dt>글</dt>
-                  <dd className="font-semibold text-ink">{blog.post_count}</dd>
-                </div>
-                <div className="flex gap-1.5">
-                  <dt>팔로워</dt>
-                  <dd className="font-semibold text-ink">{blog.follower_count}</dd>
-                </div>
-                <div className="flex gap-1.5">
-                  <dt>팔로잉</dt>
-                  <dd className="font-semibold text-ink">{blog.following_count}</dd>
-                </div>
-              </dl>
-            </div>
-            <FollowButton handle={blog.handle} />
+    <div className="mx-auto max-w-shell px-4 py-12 md:px-6">
+      <header className="border-b border-border pb-10">
+        <div className="flex flex-wrap items-start gap-6">
+          <Avatar
+            handle={blog.handle}
+            displayName={blog.display_name}
+            src={blog.avatar_url}
+            size={128}
+            className="shadow-card"
+          />
+          <div className="min-w-0 flex-1">
+            <h1 className="text-3xl font-extrabold tracking-tight text-ink">
+              {blog.display_name}
+            </h1>
+            <p className="mt-1 text-ink-faint">@{blog.handle}</p>
+            {blog.bio && (
+              <p className="mt-4 max-w-prose leading-relaxed text-ink-muted">{blog.bio}</p>
+            )}
+            <dl className="mt-5 flex flex-wrap gap-6 text-sm text-ink-muted">
+              <div className="flex gap-1.5">
+                <dt>글</dt>
+                <dd className="font-bold text-ink">{blog.post_count}</dd>
+              </div>
+              <div className="flex gap-1.5">
+                <dt>팔로워</dt>
+                <dd className="font-bold text-ink">{blog.follower_count}</dd>
+              </div>
+              <div className="flex gap-1.5">
+                <dt>팔로잉</dt>
+                <dd className="font-bold text-ink">{blog.following_count}</dd>
+              </div>
+            </dl>
           </div>
+          <FollowButton handle={blog.handle} />
+        </div>
 
-          {blog.series.length > 0 && (
-            <nav aria-label="시리즈" className="mt-8">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-ink-muted">시리즈</h2>
-              <ul className="mt-3 flex flex-wrap gap-2">
-                {blog.series.map((s) => (
-                  <li key={s.slug}>
-                    <Link
-                      href={`/@${blog.handle}/series/${encodeURIComponent(s.slug)}`}
-                      className="inline-flex items-center rounded-full border border-black/10 bg-surface px-4 py-2 text-sm text-ink transition-colors hover:border-black/20"
-                    >
-                      {s.name}
-                      <span className="ml-2 text-xs text-ink-muted">{s.post_count}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          )}
-        </header>
+        {blog.series.length > 0 && (
+          <nav aria-label="시리즈" className="mt-8">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-ink-faint">시리즈</h2>
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {blog.series.map((s) => (
+                <li key={s.slug}>
+                  <Link
+                    href={`/@${blog.handle}/series/${encodeURIComponent(s.slug)}`}
+                    className="inline-flex items-center rounded border border-border bg-surface px-4 py-2 text-sm text-ink transition-colors hover:border-ink-faint"
+                  >
+                    {s.name}
+                    <span className="ml-2 text-xs text-ink-faint">{s.post_count}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
+      </header>
 
-        <main>
-          {posts && posts.items.length > 0 ? (
-            posts.items.map((post) => <PostCard key={post.id} post={post} />)
-          ) : (
-            <p className="py-16 text-center text-ink-muted">아직 발행한 글이 없습니다.</p>
-          )}
-        </main>
-      </div>
+      <main className="pt-8">
+        {posts && posts.items.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {posts.items.map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))}
+          </div>
+        ) : (
+          <p className="py-20 text-center text-ink-muted">아직 발행한 글이 없습니다.</p>
+        )}
+      </main>
     </div>
   )
 }
