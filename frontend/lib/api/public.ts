@@ -44,6 +44,16 @@ export interface CommentNode {
   replies: CommentNode[]
 }
 
+export interface SeriesNavData {
+  name: string
+  url: string
+  /** 공개된 글만 세어서 매긴 순번. 중간 편을 내려도 번호가 건너뛰지 않는다. */
+  position: number
+  total: number
+  previous: { title: string; url: string } | null
+  next: { title: string; url: string } | null
+}
+
 export interface PostDetail extends PostCard {
   content_md: string
   view_count: number
@@ -51,6 +61,7 @@ export interface PostDetail extends PostCard {
   is_liked: boolean
   is_following_author: boolean
   is_mine: boolean
+  series: SeriesNavData | null
 }
 
 export interface BlogHome extends Author {
