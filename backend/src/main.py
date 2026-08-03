@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from src.application.errors import ApplicationError
+from src.application.errors import ApplicationError, StaleDraftError
 from src.infrastructure.config.settings import settings
 from src.ports.input.api.v1.router import api_router
 
@@ -39,7 +39,13 @@ app.add_middleware(
 @app.exception_handler(ApplicationError)
 async def application_error_handler(request: Request, exc: ApplicationError):
     """use case 예외를 HTTP 응답으로 변환한다."""
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
+    body = {"detail": exc.message}
+    if isinstance(exc, StaleDraftError):
+        # 충돌은 "실패했다" 로 끝내면 안 된다. 클라이언트가 상대 내용을 보여주고
+        # 덮어쓸지 고르게 하려면 현재 상태를 함께 줘야 한다.
+        body["current_revision"] = exc.current_revision
+        body["current_content_md"] = exc.content_md
+    return JSONResponse(status_code=exc.status_code, content=body)
 
 
 @app.exception_handler(Exception)
