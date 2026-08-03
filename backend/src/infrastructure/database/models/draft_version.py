@@ -20,6 +20,10 @@ class DraftVersion(Base):
     created_at = Column(DateTime, server_default=func.now())
     # 자동저장(in-place 수정) 시각. 새 버전을 만들지 않는 편집은 이 값만 갱신된다.
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    # 저장할 때마다 1 씩 오른다. 낙관적 잠금용.
+    # 두 탭에서 같은 글을 열면 나중에 저장한 쪽이 앞의 내용을 조용히 덮어쓴다.
+    # 클라이언트가 마지막으로 본 revision 을 같이 보내게 해서 어긋나면 거절한다.
+    revision = Column(Integer, nullable=False, default=1, server_default="1")
 
     # Relationships
     draft = relationship("Draft", back_populates="versions")
