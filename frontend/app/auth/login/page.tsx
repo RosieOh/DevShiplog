@@ -163,6 +163,18 @@ export default function LoginPage() {
             </button>
           </div>
 
+          {/* 로그인 화면에만 둔다. 회원가입 중에는 재설정할 비밀번호가 없다. */}
+          {!isSignUp && (
+            <div className="mt-2 text-center">
+              <Link
+                href="/auth/forgot"
+                className="inline-flex min-h-touch items-center px-2 text-sm text-ink-muted transition-colors hover:text-ink"
+              >
+                비밀번호를 잊으셨나요?
+              </Link>
+            </div>
+          )}
+
           <div className="mt-8 pt-8 border-t border-border">
             <Link
               href="/"
