@@ -11,6 +11,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import Link from 'next/link'
 import { AlertIcon, CheckCircleIcon, ClipboardIcon, DownloadIcon } from '@/components/ui/icons'
+import PublishPanel from '@/components/blog/PublishPanel'
 
 const AUTOSAVE_DELAY_MS = 2000
 
@@ -27,7 +28,7 @@ export default function DraftEditPage() {
 
   const [draft, setDraft] = useState<Draft | null>(null)
   const [content, setContent] = useState('')
-  const [activeTab, setActiveTab] = useState<'content' | 'safety' | 'export' | 'versions' | 'transform'>('content')
+  const [activeTab, setActiveTab] = useState<'content' | 'safety' | 'publish' | 'export' | 'versions' | 'transform'>('content')
   const [findings, setFindings] = useState<RiskFinding[]>([])
   const [loading, setLoading] = useState(true)
   const [scanning, setScanning] = useState(false)
@@ -300,6 +301,16 @@ export default function DraftEditPage() {
               Safety
             </button>
             <button
+              onClick={() => setActiveTab('publish')}
+              className={`px-6 py-5 font-semibold transition-colors whitespace-nowrap ${
+                activeTab === 'publish'
+                  ? 'text-ink border-b-2 border-accent-ink'
+                  : 'text-ink-muted hover:text-ink'
+              }`}
+            >
+              발행
+            </button>
+            <button
               onClick={() => setActiveTab('export')}
               className={`px-6 py-5 font-semibold transition-colors whitespace-nowrap ${
                 activeTab === 'export'
@@ -501,6 +512,8 @@ export default function DraftEditPage() {
             )}
           </div>
         )}
+
+        {activeTab === 'publish' && <PublishPanel draftId={draftId} />}
 
         {activeTab === 'export' && (
           <div className="bg-surface rounded-[32px] border border-black/5 p-8">
