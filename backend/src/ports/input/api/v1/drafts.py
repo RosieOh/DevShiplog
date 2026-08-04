@@ -7,6 +7,7 @@ from src.application.use_cases.draft.create_draft import CreateDraftUseCase
 from src.application.use_cases.draft.transform_draft import TransformDraftUseCase
 from src.infrastructure.queue.tasks.draft_generation_tasks import generate_draft_task
 from src.infrastructure.queue.tasks.transform_tasks import transform_draft_task
+from src.infrastructure.queue import enqueue
 from src.ports.input.api.v1.dependencies import (
     get_current_user_id,
     get_draft_repo,
@@ -119,7 +120,7 @@ def create_draft(
         style_profile_id=request.style_profile_id,
     )
 
-    generate_draft_task.delay(result["job_id"], result["id"], request.source_ids)
+    enqueue(generate_draft_task, result["job_id"], result["id"], request.source_ids)
     return result
 
 
@@ -216,5 +217,5 @@ def transform_draft(
     use_case = TransformDraftUseCase(draft_repo, job_repo)
     result = use_case.execute(user_id, draft_id, request.transform_type)
 
-    transform_draft_task.delay(result["job_id"], draft_id, request.transform_type)
+    enqueue(transform_draft_task, result["job_id"], draft_id, request.transform_type)
     return result
