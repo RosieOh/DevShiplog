@@ -12,6 +12,7 @@
 
 import json
 import logging
+import time
 from typing import Iterable, List, Optional
 
 import httpx
@@ -25,6 +26,13 @@ TIMEOUT_SECONDS = 3.0
 # Next 인스턴스가 구독하는 채널. 인스턴스가 몇 대든 각자 자기 캐시를 깬다.
 CHANNEL = "devshiplog:revalidate"
 
+# 재사용하는 발행 클라이언트. 실패하면 None 으로 되돌려 다음에 새로 만든다.
+_client = None
+# Redis 가 죽었을 때 매 요청마다 연결 타임아웃을 기다리지 않기 위한 차단기.
+# 이 시각까지는 시도 자체를 건너뛴다.
+_skip_until = 0.0
+BREAKER_SECONDS = 30.0
+
 
 def tags_for_post(handle: Optional[str], slug: Optional[str]) -> List[str]:
     tags = ["feed"]
@@ -35,19 +43,48 @@ def tags_for_post(handle: Optional[str], slug: Optional[str]) -> List[str]:
     return tags
 
 
+def _redis_client():
+    """발행용 Redis 클라이언트. 한 번 만들어 재사용한다.
+
+    호출마다 새로 만들면 연결이 매번 새로 열리고, Redis 가 죽었을 때는
+    호출마다 연결 타임아웃을 통째로 기다린다.
+    """
+    global _client
+    if _client is None:
+        import redis  # noqa: PLC0415
+
+        _client = redis.Redis.from_url(
+            settings.REDIS_URL,
+            # 캐시를 깨라는 통지일 뿐이다. 몇 초를 기다릴 가치가 없다.
+            # connect 타임아웃을 안 주면 OS 기본값(수십 초)까지 매달린다.
+            socket_connect_timeout=1,
+            socket_timeout=1,
+            health_check_interval=30,
+        )
+    return _client
+
+
 def _publish(tag_list: List[str]) -> bool:
     """Redis 로 팬아웃한다. 성공하면 True.
 
     HTTP 로 한 곳만 때리면 Next 를 여러 대 띄웠을 때 그 한 대만 캐시가 갱신되고
     나머지는 낡은 글을 계속 내보낸다. 발행자는 어떤 인스턴스가 몇 대인지 모른다.
     """
-    try:
-        import redis  # noqa: PLC0415
+    global _client, _skip_until
 
-        client = redis.Redis.from_url(settings.REDIS_URL, socket_timeout=TIMEOUT_SECONDS)
-        client.publish(CHANNEL, json.dumps({"tags": tag_list}))
+    # 방금 실패했다면 잠시 시도하지 않는다. 안 그러면 Redis 가 죽어 있는 동안
+    # 발행·댓글 하나하나가 연결 타임아웃만큼 느려진다.
+    if time.monotonic() < _skip_until:
+        return False
+
+    try:
+        _redis_client().publish(CHANNEL, json.dumps({"tags": tag_list}))
         return True
     except Exception:
+        # 끊긴 연결을 계속 붙들고 있지 않는다. 다음 호출에서 새로 만든다.
+        _client = None
+        _skip_until = time.monotonic() + BREAKER_SECONDS
+        logger.warning("캐시 무효화 발행 실패 — %.0f초간 HTTP 통지로 대체합니다", BREAKER_SECONDS)
         return False
 
 
