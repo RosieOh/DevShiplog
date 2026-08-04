@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional
 
-from src.application.errors import NotFoundError, PermissionDeniedError, ValidationError
+from src.application.errors import NotFoundError, ValidationError
 from src.domain.enums import RiskStatus, SafetyAction
 from src.domain.services.safety_scanner import SafetyScanner
 from src.ports.output.repositories.draft_repository import DraftRepository
@@ -34,8 +34,10 @@ class ApplyFixUseCase:
         draft = self.draft_repo.get_by_id(draft_id)
         if not draft:
             raise NotFoundError("Draft 를 찾을 수 없습니다.")
+        # 소유권 불일치도 404 로 답한다. 403 은 "그 Draft 는 존재한다" 를 알려주는 셈이라
+        # guards.get_owned_draft 와 동작이 달라지고 존재 여부가 새어나간다.
         if draft.user_id != user_id:
-            raise PermissionDeniedError("이 Draft 에 접근할 수 없습니다.")
+            raise NotFoundError("Draft 를 찾을 수 없습니다.")
 
         latest_version = self.draft_repo.get_latest_version(draft_id)
         if not latest_version:
@@ -46,7 +48,7 @@ class ApplyFixUseCase:
             raise NotFoundError("검사 결과를 찾을 수 없습니다.")
         # finding 이 이 Draft 의 최신 버전에 속하는지 확인 (다른 글의 finding_id 차단)
         if finding.draft_version_id != latest_version.id:
-            raise PermissionDeniedError("이 Draft 의 검사 결과가 아닙니다.")
+            raise NotFoundError("검사 결과를 찾을 수 없습니다.")
 
         if safety_action is SafetyAction.IGNORE:
             self.risk_finding_repo.update_status(
