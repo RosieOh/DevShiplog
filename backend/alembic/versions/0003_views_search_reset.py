@@ -80,9 +80,17 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     if _is_mysql():
-        op.execute("ALTER TABLE posts DROP INDEX ft_posts_title_body")
+        # 인덱스 생성이 대체 경로를 탔거나 앞선 다운그레이드가 중간에 멈췄을 수 있다.
+        # MySQL 은 DDL 을 롤백하지 않으므로 다운그레이드는 여러 번 돌려도 안전해야 한다.
+        try:
+            op.execute("ALTER TABLE posts DROP INDEX ft_posts_title_body")
+        except Exception:
+            pass
+
     op.drop_column('draft_versions', 'revision')
-    op.drop_index('ix_password_reset_user', table_name='password_reset_tokens')
+
+    # 인덱스를 따로 지우지 않는다. drop_table 이 같이 지운다.
+    # 게다가 이 인덱스들의 첫 컬럼은 외래키라, 테이블보다 먼저 지우려 하면
+    # MariaDB 가 "외래키에 필요한 인덱스" 라며 거절한다 (1553).
     op.drop_table('password_reset_tokens')
-    op.drop_index('ix_post_views_user_time', table_name='post_views')
     op.drop_table('post_views')
