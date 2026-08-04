@@ -14,7 +14,7 @@ AI 가 초안을 만들어 주고, 내 블로그 톤으로 다듬고, 민감정�
 - **Backend**: FastAPI (Python 3.11+) + Hexagonal Architecture
 - **Database**: MariaDB 10.11+ (SQLAlchemy + Alembic)
 - **Queue**: Celery + Redis
-- **Storage**: AWS S3 (또는 로컬)
+- **Storage**: MinIO (S3 호환) — 개발·운영 동일 코드, AWS S3 로 전환 가능
 
 ## 📁 프로젝트 구조
 
@@ -58,6 +58,14 @@ pip install -r requirements.txt
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env.local
 ```
+
+기본값은 `docker compose` 로 뜨는 MariaDB·Redis·MinIO 를 가리킵니다.
+MinIO 버킷은 백엔드가 기동할 때 자동으로 만들어지므로 따로 준비할 것이 없습니다.
+콘솔은 http://localhost:9001 (devshiplog / devshiplog1234) 입니다.
+
+> **배포 전 확인**: `STORAGE_PUBLIC_BASE_URL` 이 글 본문에 그대로 박히는 주소입니다.
+> localhost 인 채로 발행하면 독자에게 이미지가 깨져 보이고, 나중에 고쳐도 DB 에 남습니다.
+> `ENVIRONMENT=production` 이면 기동 시 이 값을 검사해 막습니다.
 
 최소한 `backend/.env` 의 `OPENAI_API_KEY` 와 `frontend/.env.local` 의 `NEXTAUTH_SECRET` 은
 채워야 동작합니다. `ENVIRONMENT=production` 으로 띄우면 `SECRET_KEY` 가 기본값이거나
@@ -166,7 +174,7 @@ npm run build
 ## 🎯 개발 로드맵
 
 - **완료**: 글쓰기 도구 + 블로그 플랫폼(발행·공개 읽기·SEO·소셜·모더레이션)
-- **다음**: 이미지 업로드(S3), 커버 이미지, 시리즈 편집 UI, 운영자 신고 처리 화면
+- **다음**: 시리즈 편집 UI, 운영자 신고 처리 화면
 - **이후**: GitHub OAuth, 크로스포스팅, 전문검색(FULLTEXT) 전환
 
 ## 📝 라이선스
