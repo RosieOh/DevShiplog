@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from src.application.use_cases.style_profile.create_style_profile import CreateStyleProfileUseCase
 from src.infrastructure.queue.tasks.style_profile_tasks import analyze_style_profile_task
+from src.infrastructure.queue import enqueue
 from src.ports.input.api.v1.dependencies import (
     get_current_user_id,
     get_job_repo,
@@ -52,7 +53,7 @@ def create_style_profile(
     use_case = CreateStyleProfileUseCase(style_profile_repo, job_repo)
     result = use_case.execute(user_id, request.blog_url, request.sample_count)
 
-    analyze_style_profile_task.delay(result["id"])
+    enqueue(analyze_style_profile_task, result["id"])
     return result
 
 
