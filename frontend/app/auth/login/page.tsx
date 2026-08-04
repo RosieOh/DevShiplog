@@ -61,8 +61,8 @@ export default function LoginPage() {
 
         router.push('/dashboard')
       }
-    } catch (err: any) {
-      setError(err.message || '오류가 발생했습니다.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '오류가 발생했습니다.')
     } finally {
       setLoading(false)
     }
@@ -121,9 +121,10 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
+                // 백엔드 회원가입 정책과 동일하게 8자 이상
+                minLength={isSignUp ? 8 : undefined}
                 className="w-full p-4 border border-black/10 rounded-2xl focus:ring-2 focus:ring-[#d1fb52] focus:border-transparent bg-[#f9f9f7]"
-                placeholder="비밀번호를 입력하세요"
+                placeholder={isSignUp ? '8자 이상 입력하세요' : '비밀번호를 입력하세요'}
               />
             </div>
 

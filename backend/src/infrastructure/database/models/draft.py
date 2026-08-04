@@ -1,14 +1,12 @@
-from sqlalchemy import Column, String, ForeignKey, DateTime, Enum, JSON
+from sqlalchemy import Column, String, ForeignKey, DateTime, Enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
-import enum
-from infrastructure.database.session import Base
 
+from src.domain.enums import DraftStatus
+from src.infrastructure.database.session import Base
 
-class DraftStatus(str, enum.Enum):
-    ACTIVE = "active"
-    ARCHIVED = "archived"
+__all__ = ["Draft", "DraftStatus"]
 
 
 class Draft(Base):
@@ -26,5 +24,9 @@ class Draft(Base):
     # Relationships
     user = relationship("User", back_populates="drafts")
     style_profile = relationship("StyleProfile", back_populates="drafts")
-    versions = relationship("DraftVersion", back_populates="draft", cascade="all, delete-orphan", order_by="DraftVersion.version_no")
-
+    versions = relationship(
+        "DraftVersion",
+        back_populates="draft",
+        cascade="all, delete-orphan",
+        order_by="DraftVersion.version_no",
+    )

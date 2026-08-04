@@ -85,15 +85,15 @@ class CreateDraftUseCase:
 
 ### 3. 비동기 Job 처리
 
-1. `infrastructure/queue/tasks/`에 Celery Task 정의
+1. `src/infrastructure/queue/tasks/`에 Celery Task 정의
 2. API에서 Job 생성 후 Task 큐에 추가
 3. Worker가 처리하고 결과를 DB에 저장
 4. 프론트엔드는 Job 상태를 폴링하거나 SSE로 수신
 
 예시:
 ```python
-# infrastructure/queue/tasks/draft_generation_tasks.py
-from infrastructure.queue.celery_app import celery_app
+# src/infrastructure/queue/tasks/draft_generation_tasks.py
+from src.infrastructure.queue.celery_app import celery_app
 
 @celery_app.task
 def generate_draft_task(draft_id: str, source_ids: list):

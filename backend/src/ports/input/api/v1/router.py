@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from ports.input.api.v1 import auth, style_profiles, sources, drafts, jobs, safety, export, usage
+from src.ports.input.api.v1 import auth, style_profiles, sources, drafts, jobs, safety, export, usage
 
 api_router = APIRouter()
 

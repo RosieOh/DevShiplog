@@ -1,15 +1,18 @@
-from typing import List
-from sqlalchemy.orm import Session
-from infrastructure.database.models.risk_finding import RiskFinding, RiskCategory, RiskSeverity, RiskStatus
-from ports.output.repositories.risk_finding_repository import RiskFindingRepository
 import uuid
+from typing import List, Optional
+
+from sqlalchemy.orm import Session
+
+from src.domain.enums import RiskCategory, RiskSeverity, RiskStatus
+from src.infrastructure.database.models.risk_finding import RiskFinding
+from src.ports.output.repositories.risk_finding_repository import RiskFindingRepository
 
 
 class RiskFindingRepositoryImpl(RiskFindingRepository):
     def __init__(self, db: Session):
         self.db = db
 
-    async def create(
+    def create(
         self,
         draft_version_id: str,
         category: str,
@@ -31,28 +34,40 @@ class RiskFindingRepositoryImpl(RiskFindingRepository):
         self.db.refresh(finding)
         return finding
 
-    async def get_by_draft_version_id(self, draft_version_id: str) -> List[RiskFinding]:
+    def get_by_id(self, finding_id: str) -> Optional[RiskFinding]:
+        return self.db.query(RiskFinding).filter(RiskFinding.id == finding_id).first()
+
+    def get_by_draft_version_id(self, draft_version_id: str) -> List[RiskFinding]:
         return (
             self.db.query(RiskFinding)
             .filter(RiskFinding.draft_version_id == draft_version_id)
+            .order_by(RiskFinding.severity.desc())
             .all()
         )
 
-    async def update_status(
+    def delete_by_draft_version_id(self, draft_version_id: str) -> int:
+        deleted = (
+            self.db.query(RiskFinding)
+            .filter(RiskFinding.draft_version_id == draft_version_id)
+            .delete(synchronize_session=False)
+        )
+        self.db.commit()
+        return deleted
+
+    def update_status(
         self,
         finding_id: str,
         status: RiskStatus,
-        ignore_reason: str = None,
+        ignore_reason: Optional[str] = None,
     ) -> RiskFinding:
-        finding = self.db.query(RiskFinding).filter(RiskFinding.id == finding_id).first()
+        finding = self.get_by_id(finding_id)
         if not finding:
             raise ValueError(f"RiskFinding {finding_id} not found")
-        
+
         finding.status = status
-        if ignore_reason:
+        if ignore_reason is not None:
             finding.ignore_reason = ignore_reason
-        
+
         self.db.commit()
         self.db.refresh(finding)
         return finding
-

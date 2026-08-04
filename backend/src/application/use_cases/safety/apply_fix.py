@@ -1,8 +1,10 @@
-from typing import Dict, Any
-from ports.output.repositories.draft_repository import DraftRepository
-from ports.output.repositories.risk_finding_repository import RiskFindingRepository
-from infrastructure.database.models.risk_finding import RiskStatus
-from domain.services.safety_scanner import SafetyScanner
+from typing import Any, Dict, Optional
+
+from src.application.errors import NotFoundError, PermissionDeniedError, ValidationError
+from src.domain.enums import RiskStatus, SafetyAction
+from src.domain.services.safety_scanner import SafetyScanner
+from src.ports.output.repositories.draft_repository import DraftRepository
+from src.ports.output.repositories.risk_finding_repository import RiskFindingRepository
 
 
 class ApplyFixUseCase:
@@ -15,79 +17,65 @@ class ApplyFixUseCase:
         self.risk_finding_repo = risk_finding_repo
         self.scanner = SafetyScanner()
 
-    async def execute(
+    def execute(
         self,
+        user_id: str,
         draft_id: str,
         finding_id: str,
         action: str,
-        reason: str = None,
+        reason: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Safety 검사 결과 적용"""
-        draft = await self.draft_repo.get_by_id(draft_id)
+        """Safety 검사 결과에 대한 조치를 적용한다."""
+        try:
+            safety_action = SafetyAction(action)
+        except ValueError:
+            raise ValidationError(f"지원하지 않는 조치입니다: {action}") from None
+
+        draft = self.draft_repo.get_by_id(draft_id)
         if not draft:
-            raise ValueError(f"Draft {draft_id} not found")
+            raise NotFoundError("Draft 를 찾을 수 없습니다.")
+        if draft.user_id != user_id:
+            raise PermissionDeniedError("이 Draft 에 접근할 수 없습니다.")
 
-        latest_version = await self.draft_repo.get_latest_version(draft_id)
+        latest_version = self.draft_repo.get_latest_version(draft_id)
         if not latest_version:
-            raise ValueError(f"No version found for draft {draft_id}")
+            raise NotFoundError("Draft 버전이 없습니다.")
 
-        # Finding 조회
-        findings = await self.risk_finding_repo.get_by_draft_version_id(latest_version.id)
-        finding = next((f for f in findings if f.id == finding_id), None)
+        finding = self.risk_finding_repo.get_by_id(finding_id)
         if not finding:
-            raise ValueError(f"Finding {finding_id} not found")
+            raise NotFoundError("검사 결과를 찾을 수 없습니다.")
+        # finding 이 이 Draft 의 최신 버전에 속하는지 확인 (다른 글의 finding_id 차단)
+        if finding.draft_version_id != latest_version.id:
+            raise PermissionDeniedError("이 Draft 의 검사 결과가 아닙니다.")
 
-        # 액션 처리
-        if action == "mask":
-            # 마스킹 적용
-            content = latest_version.content_md or ""
-            masked_content = self.scanner.mask_content(content, {
-                "snippet": finding.snippet,
-                "location": finding.location_json,
-            })
-            
-            # 새 버전 생성
-            version_no = latest_version.version_no + 1
-            await self.draft_repo.create_version(
-                draft_id=draft_id,
-                version_no=version_no,
-                content_md=masked_content,
-                meta_json=latest_version.meta_json,
+        if safety_action is SafetyAction.IGNORE:
+            self.risk_finding_repo.update_status(
+                finding_id=finding_id, status=RiskStatus.IGNORED, ignore_reason=reason
+            )
+            return {"message": "무시 처리했습니다.", "new_version_no": None}
+
+        payload = {"snippet": finding.snippet, "location": finding.location_json}
+        content = latest_version.content_md or ""
+
+        if safety_action is SafetyAction.MASK:
+            new_content = self.scanner.mask_content(content, payload)
+            new_status = RiskStatus.MASKED
+        else:  # DELETE — 줄 전체가 아니라 해당 값만 제거한다.
+            new_content = self.scanner.remove_finding(content, payload)
+            new_status = RiskStatus.DELETED
+
+        if new_content == content:
+            raise ValidationError(
+                "본문이 변경되어 해당 위치를 찾을 수 없습니다. 다시 검사해주세요."
             )
 
-            await self.risk_finding_repo.update_status(
-                finding_id=finding_id,
-                status=RiskStatus.MASKED,
-            )
+        version_no = self.draft_repo.next_version_no(draft_id)
+        new_version = self.draft_repo.create_version(
+            draft_id=draft_id,
+            version_no=version_no,
+            content_md=new_content,
+            meta_json=latest_version.meta_json,
+        )
+        self.risk_finding_repo.update_status(finding_id=finding_id, status=new_status)
 
-        elif action == "delete":
-            # 삭제 (해당 부분 제거)
-            content = latest_version.content_md or ""
-            lines = content.split("\n")
-            location = finding.location_json
-            if location.get("line") and location["line"] <= len(lines):
-                lines.pop(location["line"] - 1)
-            
-            new_content = "\n".join(lines)
-            version_no = latest_version.version_no + 1
-            await self.draft_repo.create_version(
-                draft_id=draft_id,
-                version_no=version_no,
-                content_md=new_content,
-                meta_json=latest_version.meta_json,
-            )
-
-            await self.risk_finding_repo.update_status(
-                finding_id=finding_id,
-                status=RiskStatus.DELETED,
-            )
-
-        elif action == "ignore":
-            await self.risk_finding_repo.update_status(
-                finding_id=finding_id,
-                status=RiskStatus.IGNORED,
-                ignore_reason=reason,
-            )
-
-        return {"message": "Fix applied successfully"}
-
+        return {"message": "조치를 적용했습니다.", "new_version_no": new_version.version_no}
