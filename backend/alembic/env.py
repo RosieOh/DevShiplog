@@ -2,8 +2,11 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
-from infrastructure.database.session import Base
-from infrastructure.config.settings import settings
+from src.infrastructure.database.session import Base
+from src.infrastructure.config.settings import settings
+
+# autogenerate 가 테이블을 인식하려면 모든 모델이 import 되어 있어야 한다.
+import src.infrastructure.database.models  # noqa: F401  (side-effect import)
 
 # this is the Alembic Config object
 config = context.config
@@ -12,8 +15,9 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set SQLAlchemy URL from settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Set SQLAlchemy URL from settings.
+# ConfigParser 는 % 를 보간 문자로 해석하므로 이스케이프한다 (비밀번호에 % 가 있을 수 있다).
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
 
 # add your model's MetaData object here
 target_metadata = Base.metadata

@@ -1,16 +1,20 @@
-from typing import Optional, List
-from sqlalchemy.orm import Session
-from infrastructure.database.models.draft import Draft, DraftStatus
-from infrastructure.database.models.draft_version import DraftVersion
-from ports.output.repositories.draft_repository import DraftRepository
 import uuid
+from typing import List, Optional
+
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from src.domain.enums import DraftStatus
+from src.infrastructure.database.models.draft import Draft
+from src.infrastructure.database.models.draft_version import DraftVersion
+from src.ports.output.repositories.draft_repository import DraftRepository
 
 
 class DraftRepositoryImpl(DraftRepository):
     def __init__(self, db: Session):
         self.db = db
 
-    async def create(
+    def create(
         self,
         user_id: str,
         draft_type: str,
@@ -32,18 +36,23 @@ class DraftRepositoryImpl(DraftRepository):
         self.db.refresh(draft)
         return draft
 
-    async def get_by_id(self, draft_id: str) -> Optional[Draft]:
+    def get_by_id(self, draft_id: str) -> Optional[Draft]:
         return self.db.query(Draft).filter(Draft.id == draft_id).first()
 
-    async def get_by_user_id(self, user_id: str) -> List[Draft]:
-        return self.db.query(Draft).filter(Draft.user_id == user_id).order_by(Draft.created_at.desc()).all()
+    def get_by_user_id(self, user_id: str) -> List[Draft]:
+        return (
+            self.db.query(Draft)
+            .filter(Draft.user_id == user_id)
+            .order_by(Draft.created_at.desc())
+            .all()
+        )
 
-    async def create_version(
+    def create_version(
         self,
         draft_id: str,
         version_no: int,
         content_md: str,
-        meta_json: dict = None,
+        meta_json: Optional[dict] = None,
     ) -> DraftVersion:
         version = DraftVersion(
             id=str(uuid.uuid4()),
@@ -57,7 +66,28 @@ class DraftRepositoryImpl(DraftRepository):
         self.db.refresh(version)
         return version
 
-    async def get_latest_version(self, draft_id: str) -> Optional[DraftVersion]:
+    def update_version_content(
+        self,
+        version_id: str,
+        content_md: str,
+        meta_json: Optional[dict] = None,
+    ) -> DraftVersion:
+        version = self.get_version_by_id(version_id)
+        if not version:
+            raise ValueError(f"DraftVersion {version_id} not found")
+
+        version.content_md = content_md
+        if meta_json is not None:
+            version.meta_json = meta_json
+
+        self.db.commit()
+        self.db.refresh(version)
+        return version
+
+    def get_version_by_id(self, version_id: str) -> Optional[DraftVersion]:
+        return self.db.query(DraftVersion).filter(DraftVersion.id == version_id).first()
+
+    def get_latest_version(self, draft_id: str) -> Optional[DraftVersion]:
         return (
             self.db.query(DraftVersion)
             .filter(DraftVersion.draft_id == draft_id)
@@ -65,7 +95,7 @@ class DraftRepositoryImpl(DraftRepository):
             .first()
         )
 
-    async def get_versions(self, draft_id: str) -> List[DraftVersion]:
+    def get_versions(self, draft_id: str) -> List[DraftVersion]:
         return (
             self.db.query(DraftVersion)
             .filter(DraftVersion.draft_id == draft_id)
@@ -73,3 +103,10 @@ class DraftRepositoryImpl(DraftRepository):
             .all()
         )
 
+    def next_version_no(self, draft_id: str) -> int:
+        current_max = (
+            self.db.query(func.max(DraftVersion.version_no))
+            .filter(DraftVersion.draft_id == draft_id)
+            .scalar()
+        )
+        return (current_max or 0) + 1

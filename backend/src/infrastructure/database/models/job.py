@@ -1,24 +1,12 @@
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum, JSON, Text, Index
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum, JSON, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
-import enum
-from infrastructure.database.session import Base
 
+from src.domain.enums import JobStatus, JobType
+from src.infrastructure.database.session import Base
 
-class JobType(str, enum.Enum):
-    EXTRACT = "extract"
-    STYLE = "style"
-    DRAFT = "draft"
-    TRANSFORM = "transform"
-    SAFETY = "safety"
-
-
-class JobStatus(str, enum.Enum):
-    QUEUED = "queued"
-    RUNNING = "running"
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
+__all__ = ["Job", "JobStatus", "JobType"]
 
 
 class Job(Base):
@@ -31,9 +19,8 @@ class Job(Base):
     progress = Column(Integer, default=0)
     result_ref = Column(JSON)  # 결과 참조 (draft_id 등)
     error_text = Column(Text)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime, server_default=func.now(), index=True)
 
     # Relationships
     user = relationship("User", back_populates="jobs")
     usage_logs = relationship("UsageLog", back_populates="job", cascade="all, delete-orphan")
-

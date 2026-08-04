@@ -1,38 +1,21 @@
-from sqlalchemy import Column, String, ForeignKey, DateTime, Enum, Text, JSON, Index
+from sqlalchemy import Column, String, ForeignKey, DateTime, Enum, Text, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
-import enum
-from infrastructure.database.session import Base
 
+from src.domain.enums import RiskCategory, RiskSeverity, RiskStatus
+from src.infrastructure.database.session import Base
 
-class RiskCategory(str, enum.Enum):
-    TOKEN = "token"
-    EMAIL = "email"
-    PHONE = "phone"
-    INTERNAL_URL = "internal_url"
-    COMPANY = "company"
-    SECRET = "secret"
-
-
-class RiskSeverity(str, enum.Enum):
-    LOW = "low"
-    MED = "med"
-    HIGH = "high"
-
-
-class RiskStatus(str, enum.Enum):
-    OPEN = "open"
-    MASKED = "masked"
-    DELETED = "deleted"
-    IGNORED = "ignored"
+__all__ = ["RiskFinding", "RiskCategory", "RiskSeverity", "RiskStatus"]
 
 
 class RiskFinding(Base):
     __tablename__ = "risk_findings"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    draft_version_id = Column(String(36), ForeignKey("draft_versions.id", ondelete="CASCADE"), nullable=False, index=True)
+    draft_version_id = Column(
+        String(36), ForeignKey("draft_versions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     category = Column(Enum(RiskCategory), nullable=False)
     severity = Column(Enum(RiskSeverity), default=RiskSeverity.MED)
     snippet = Column(Text)
@@ -43,4 +26,3 @@ class RiskFinding(Base):
 
     # Relationships
     draft_version = relationship("DraftVersion", back_populates="risk_findings")
-

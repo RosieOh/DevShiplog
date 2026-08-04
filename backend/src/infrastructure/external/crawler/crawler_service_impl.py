@@ -1,7 +1,7 @@
 from typing import Dict, Any, List
-from ports.output.services.crawler_service import CrawlerService
-from infrastructure.external.crawler.url_extractor import URLExtractor
-from infrastructure.external.crawler.blog_crawler import BlogCrawler
+from src.ports.output.services.crawler_service import CrawlerService
+from src.infrastructure.external.crawler.url_extractor import URLExtractor
+from src.infrastructure.external.crawler.blog_crawler import BlogCrawler
 
 
 class CrawlerServiceImpl(CrawlerService):
