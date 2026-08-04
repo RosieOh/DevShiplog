@@ -1,0 +1,162 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# 같은 PR 에 연달아 푸시하면 앞의 실행을 취소한다.
+# 어차피 볼 것은 마지막 커밋의 결과다.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: 백엔드 · 테스트
+    runs-on: ubuntu-latest
+    services:
+      # 앱이 실제로 Redis 를 쓴다 (Celery 브로커, 레이트리밋, 캐시 무효화 팬아웃).
+      # 없어도 대부분 통과하지만, 없는 채로 도는 CI 는 그 경로를 검증하지 못한다.
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: 의존성 설치
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 테스트
+        working-directory: backend
+        env:
+          # 테스트는 인메모리 SQLite 를 쓴다. DATABASE_URL 은 임포트 시점에만 필요하다.
+          ENVIRONMENT: test
+          SECRET_KEY: test-secret-key-for-ci-only-not-production
+          OPENAI_API_KEY: sk-test-not-a-real-key
+          REDIS_URL: redis://localhost:6379/0
+          # 저장소를 붙이지 않는다. 업로드 테스트는 가짜 저장소로 포트 계약만 검증한다.
+          STORAGE_BACKEND: local
+        run: pytest -q
+
+  migrations:
+    name: 백엔드 · 마이그레이션 (MariaDB)
+    runs-on: ubuntu-latest
+    # SQLite 테스트로는 안 잡히는 것을 잡기 위한 잡이다.
+    # 실제로 MariaDB 에만 없는 기능(ngram 파서)과 제약(IN 안의 LIMIT)에 걸린 적이 있다.
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: rootpassword
+          MARIADB_DATABASE: devshiplog
+          MARIADB_USER: devshiplog
+          MARIADB_PASSWORD: devshiplog
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: 의존성 설치
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 마이그레이션 적용
+        working-directory: backend
+        env:
+          DATABASE_URL: mysql+pymysql://devshiplog:devshiplog@127.0.0.1:3306/devshiplog
+          ENVIRONMENT: test
+          SECRET_KEY: test-secret-key-for-ci-only-not-production
+          OPENAI_API_KEY: sk-test-not-a-real-key
+        run: alembic upgrade head
+
+      - name: 되돌리기까지 동작하는지
+        working-directory: backend
+        env:
+          DATABASE_URL: mysql+pymysql://devshiplog:devshiplog@127.0.0.1:3306/devshiplog
+          ENVIRONMENT: test
+          SECRET_KEY: test-secret-key-for-ci-only-not-production
+          OPENAI_API_KEY: sk-test-not-a-real-key
+        # downgrade 를 안 해보면, 문제가 생겼을 때 되돌릴 수 있는지 배포 중에 알게 된다.
+        run: |
+          alembic downgrade base
+          alembic upgrade head
+
+      - name: 모델과 마이그레이션이 어긋나지 않았는지
+        working-directory: backend
+        env:
+          DATABASE_URL: mysql+pymysql://devshiplog:devshiplog@127.0.0.1:3306/devshiplog
+          ENVIRONMENT: test
+          SECRET_KEY: test-secret-key-for-ci-only-not-production
+          OPENAI_API_KEY: sk-test-not-a-real-key
+        # 모델만 고치고 마이그레이션을 빠뜨리면 배포 후에야 드러난다.
+        run: |
+          alembic revision --autogenerate -m "drift check" --rev-id drift_check
+          if grep -qE '^\s+op\.(create|drop|add|alter)' alembic/versions/drift_check_*.py; then
+            echo "::error::모델과 마이그레이션이 어긋납니다. 아래 변경이 누락되었습니다:"
+            grep -E '^\s+op\.' alembic/versions/drift_check_*.py
+            exit 1
+          fi
+          echo "어긋남 없음"
+
+  frontend:
+    name: 프론트엔드 · 타입·린트·빌드
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 의존성 설치
+        working-directory: frontend
+        run: npm ci
+
+      - name: 타입 검사
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: 린트
+        working-directory: frontend
+        # 경고는 통과시키되 오류는 막는다. 경고까지 막으면 사람들이 규칙을 끈다.
+        run: npx eslint . --ext .ts,.tsx --max-warnings 5
+
+      - name: 빌드
+        working-directory: frontend
+        env:
+          # 빌드 시점에 실제 백엔드가 필요하지는 않다. 값이 있기만 하면 된다.
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+          NEXTAUTH_URL: http://localhost:3000
+          NEXTAUTH_SECRET: build-only-secret
+        run: npm run build
