@@ -2,12 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * 색 토큰. tailwind.config.ts 가 이 값을 rgb(var(--token) / <alpha-value>) 로 읽으므로
+ * 채널 3개만 적는다. 여기가 색의 단일 출처이며, 컴포넌트에는 hex 를 쓰지 않는다.
+ */
 :root {
-  --bg-color: #f9f9f7;
-  --accent-color: #d1fb52;
-  --text-main: #111111;
-  --text-sub: #666666;
-  --card-bg: #ffffff;
+  --canvas: 249 249 247;
+  --surface: 255 255 255;
+  --surface-dark: 26 26 26;
+  --ink: 17 17 17;
+  --ink-muted: 102 102 102;
+  --line: 229 229 229;
+
+  /*
+   * accent 는 배경 전용이다.
+   * canvas 위 전경으로 쓰면 1.13:1 이라 사실상 보이지 않는다 (WCAG 최소 4.5:1).
+   * 전경이 필요하면 같은 색상(hue 76°)의 어두운 파생색 accent-ink 를 쓴다. → 5.8:1
+   */
+  --accent: 209 251 82;
+  --accent-ink: 77 107 0;
 }
 
 * {
@@ -15,12 +28,35 @@
 }
 
 body {
-  background-color: var(--bg-color);
-  color: var(--text-main);
-  overflow-x: hidden;
+  background-color: rgb(var(--canvas));
+  color: rgb(var(--ink));
   line-height: 1.5;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-  scroll-behavior: smooth;
+  /* --font-sans 는 app/layout.tsx 의 next/font 가 주입한다. */
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* 부드러운 스크롤은 모션을 허용한 사용자에게만 적용한다. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer base {
+  /*
+   * 키보드 포커스를 전역에서 보장한다.
+   * 이전에는 일부 입력에만 focus:ring-[#d1fb52] 가 있었고, 그마저도 흰 배경 대비
+   * 1.19:1 이라 보이지 않았다. outline 은 요소별 클래스 없이 모든 컨트롤에 적용된다.
+   */
+  :focus-visible {
+    outline: 2px solid rgb(var(--ink));
+    outline-offset: 2px;
+  }
+
+  /* 어두운 표면 위에서는 반대로 밝은 아웃라인을 쓴다. */
+  .on-dark :focus-visible {
+    outline-color: rgb(var(--canvas));
+  }
 }
 
 section {
@@ -35,7 +71,7 @@ section {
 
 /* Markdown 스타일링 */
 .prose {
-  @apply text-gray-800;
+  @apply text-ink;
 }
 
 .prose h1 {
@@ -55,18 +91,19 @@ section {
 }
 
 .prose code {
-  @apply bg-gray-100 px-2 py-1 rounded text-sm font-mono;
+  @apply bg-canvas border border-line px-1.5 py-0.5 rounded text-sm font-mono;
 }
 
 .prose pre {
-  @apply bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto mb-4;
+  @apply bg-surface-dark text-canvas p-4 rounded-2xl overflow-x-auto mb-4;
 }
 
 .prose pre code {
-  @apply bg-transparent p-0 text-gray-100;
+  @apply bg-transparent border-0 p-0 text-canvas;
 }
 
-.prose ul, .prose ol {
+.prose ul,
+.prose ol {
   @apply mb-4 pl-6;
 }
 
@@ -75,22 +112,23 @@ section {
 }
 
 .prose a {
-  @apply text-blue-600 hover:text-blue-700 underline;
+  @apply text-accent-ink underline underline-offset-2 hover:text-ink transition-colors;
 }
 
+/* 1px 규칙 + 들여쓰기로 인용을 표현한다. 두꺼운 컬러 보더는 쓰지 않는다. */
 .prose blockquote {
-  @apply border-l-4 border-gray-300 pl-4 italic my-4;
+  @apply border-l border-line pl-4 italic my-4 text-ink-muted;
 }
 
 .prose table {
   @apply w-full border-collapse mb-4;
 }
 
-.prose th, .prose td {
-  @apply border border-gray-300 px-4 py-2;
+.prose th,
+.prose td {
+  @apply border border-line px-4 py-2;
 }
 
 .prose th {
-  @apply bg-gray-100 font-semibold;
+  @apply bg-canvas font-semibold text-left;
 }
-
