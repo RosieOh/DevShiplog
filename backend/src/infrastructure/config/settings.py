@@ -45,6 +45,41 @@ class Settings(BaseSettings):
     # 사용량 제한 (월간 LLM Job 수). 0 이면 무제한
     MONTHLY_JOB_QUOTA: int = 100
 
+    # 업로드 (커버 이미지·아바타)
+    UPLOAD_DIR: str = "uploads"
+    UPLOAD_PUBLIC_PREFIX: str = "/uploads"
+    MAX_UPLOAD_BYTES: int = 5 * 1024 * 1024  # 5MB
+
+    # 저장소 백엔드: "s3" | "local".
+    #
+    # 기본은 s3 이고, 개발에서는 docker compose 의 MinIO 를 가리킨다 (MinIO 는 S3 와
+    # API 가 같다). local 은 오브젝트 저장소 없이 잠깐 돌려볼 때만 쓴다 — 서버가
+    # 2대 이상이면 파일을 서로 못 보고, 컨테이너를 재배포하면 사라진다.
+    STORAGE_BACKEND: str = "s3"
+    STORAGE_S3_BUCKET: str = "devshiplog"
+    STORAGE_S3_REGION: str = "us-east-1"
+    STORAGE_S3_ACCESS_KEY: str = "devshiplog"
+    STORAGE_S3_SECRET_KEY: str = "devshiplog1234"
+    # MinIO·R2 등 S3 호환 저장소 주소. AWS S3 를 쓰면 비운다.
+    STORAGE_S3_ENDPOINT: str = "http://localhost:9000"
+    # 브라우저가 이미지를 받아갈 주소.
+    # 컨테이너 안에서는 minio:9000 으로 붙지만 브라우저는 그 호스트명을 모른다.
+    STORAGE_PUBLIC_BASE_URL: str = "http://localhost:9000/devshiplog"
+
+    # 메일 (비밀번호 재설정·알림). SMTP_HOST 가 비면 발송하지 않고 로그만 남긴다.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_USE_TLS: bool = True
+    MAIL_FROM: str = "no-reply@devshiplog.com"
+    PASSWORD_RESET_TTL_MINUTES: int = 30
+
+    # 공개 페이지 캐시 무효화 통지 대상 (Next 서버).
+    # 비워두면 통지하지 않고 시간 기반 재검증에만 의존한다.
+    FRONTEND_ORIGIN: str = ""
+    REVALIDATE_SECRET: str = ""
+
     # App
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
@@ -74,6 +109,18 @@ class Settings(BaseSettings):
             problems.append("DEBUG (프로덕션에서는 False 여야 합니다)")
         if self.CRAWLER_ALLOW_PRIVATE_NETWORK:
             problems.append("CRAWLER_ALLOW_PRIVATE_NETWORK (프로덕션에서는 False 여야 합니다)")
+        if self.STORAGE_BACKEND != "s3":
+            # 로컬 디스크는 인스턴스가 늘어나는 순간 파일이 갈라지고, 재배포하면 사라진다.
+            problems.append("STORAGE_BACKEND (프로덕션에서는 s3 여야 합니다)")
+        elif not self.STORAGE_S3_BUCKET:
+            problems.append("STORAGE_S3_BUCKET (비어 있습니다)")
+        elif self.STORAGE_S3_SECRET_KEY == "devshiplog1234":
+            # 개발용 MinIO 기본 자격증명 그대로 뜨는 것을 막는다.
+            problems.append("STORAGE_S3_SECRET_KEY (개발용 기본값입니다)")
+        elif "localhost" in self.STORAGE_PUBLIC_BASE_URL:
+            # 이 주소가 글 본문에 그대로 박힌다. 잘못 뜨면 발행된 글의 이미지가
+            # 전부 독자의 localhost 를 가리키게 되고, 나중에 고쳐도 DB 에 남는다.
+            problems.append("STORAGE_PUBLIC_BASE_URL (localhost 를 가리키고 있습니다)")
 
         if problems:
             raise ValueError(

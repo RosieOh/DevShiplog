@@ -6,22 +6,22 @@ import { AlertIcon, CheckCircleIcon, CloseIcon } from '@/components/ui/icons'
 
 const TONE = {
   success: {
-    box: 'bg-accent text-ink border-accent',
+    box: 'bg-ink text-bg border-accent',
     Icon: CheckCircleIcon,
     label: '성공',
   },
   error: {
-    box: 'bg-red-50 text-red-800 border-red-200',
+    box: 'bg-danger/10 text-danger border-danger/30',
     Icon: AlertIcon,
     label: '오류',
   },
   warning: {
-    box: 'bg-amber-50 text-amber-900 border-amber-200',
+    box: 'bg-amber-50 text-warning border-amber-200',
     Icon: AlertIcon,
     label: '경고',
   },
   info: {
-    box: 'bg-surface text-ink border-black/10',
+    box: 'bg-surface text-ink border-border',
     Icon: CheckCircleIcon,
     label: '알림',
   },
@@ -56,7 +56,7 @@ export default function Toast() {
             key={toast.id}
             // 오류는 즉시 읽어주도록 alert, 나머지는 흐름을 끊지 않는 status 로 둔다.
             role={toast.type === 'error' ? 'alert' : 'status'}
-            className={`rounded-2xl border p-4 shadow-lg shadow-black/5 ${tone.box}`}
+            className={`rounded border p-4 shadow-lg shadow-card ${tone.box}`}
           >
             <div className="flex items-start gap-3">
               <Icon className="w-5 h-5 mt-0.5" />

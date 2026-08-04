@@ -9,13 +9,26 @@ import { useJobStatus } from '@/features/drafts/hooks/useJobStatus'
 import { useToastStore } from '@/store/toastStore'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeHighlight from 'rehype-highlight'
 import Link from 'next/link'
+import MarkdownEditor from '@/components/editor/MarkdownEditor'
 import { AlertIcon, CheckCircleIcon, ClipboardIcon, DownloadIcon } from '@/components/ui/icons'
+import PublishPanel from '@/components/blog/PublishPanel'
 
 const AUTOSAVE_DELAY_MS = 2000
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback
+}
+
+/** 409 응답에서 서버의 현재 내용을 꺼낸다. 충돌이 아니면 null. */
+function staleConflict(err: unknown): { content: string; revision: number } | null {
+  const body = (err as { status?: number; body?: Record<string, unknown> })?.body
+  if ((err as { status?: number })?.status !== 409 || !body) return null
+  return {
+    content: String(body.current_content_md ?? ''),
+    revision: Number(body.current_revision ?? 0),
+  }
 }
 
 export default function DraftEditPage() {
@@ -27,7 +40,7 @@ export default function DraftEditPage() {
 
   const [draft, setDraft] = useState<Draft | null>(null)
   const [content, setContent] = useState('')
-  const [activeTab, setActiveTab] = useState<'content' | 'safety' | 'export' | 'versions' | 'transform'>('content')
+  const [activeTab, setActiveTab] = useState<'content' | 'safety' | 'publish' | 'export' | 'versions' | 'transform'>('content')
   const [findings, setFindings] = useState<RiskFinding[]>([])
   const [loading, setLoading] = useState(true)
   const [scanning, setScanning] = useState(false)
@@ -39,6 +52,18 @@ export default function DraftEditPage() {
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
   // 서버에 저장된 최신 내용. 이 값과 같으면 자동저장을 건너뛴다.
   const savedContentRef = useRef<string>('')
+  // 서버가 준 마지막 revision. 자동저장 때 같이 보내 충돌을 감지한다.
+  const revisionRef = useRef<number | null>(null)
+  const previewRef = useRef<HTMLDivElement>(null)
+  const [conflict, setConflict] = useState<{ content: string; revision: number } | null>(null)
+
+  /** 편집기 스크롤 비율을 미리보기에 그대로 옮긴다. */
+  const syncPreviewScroll = useCallback((ratio: number) => {
+    const el = previewRef.current
+    if (!el) return
+    // 줄 높이가 서로 달라서 정확히는 못 맞춘다. 비율만 맞춰도 "지금 여기" 는 따라온다.
+    el.scrollTop = ratio * (el.scrollHeight - el.clientHeight)
+  }, [])
 
   const { jobStatus: transformJob } = useJobStatus(transformJobId)
 
@@ -49,6 +74,7 @@ export default function DraftEditPage() {
       const loadedContent = loadedDraft.latest_version?.content_md || ''
       setContent(loadedContent)
       savedContentRef.current = loadedContent
+      revisionRef.current = loadedDraft.latest_version?.revision ?? null
       setVersions(await draftService.getVersions(draftId))
     } catch (err) {
       addToast({ message: errorMessage(err, 'Draft 를 불러오지 못했습니다.'), type: 'error' })
@@ -73,14 +99,27 @@ export default function DraftEditPage() {
       try {
         setSaving(true)
         // 자동저장은 새 버전을 만들지 않고 최신 버전을 제자리에서 수정한다.
-        await draftService.saveContent(draftId, {
+        const saved = await draftService.saveContent(draftId, {
           content_md: content,
           meta_json: draft?.latest_version?.meta_json ?? null,
+          base_revision: revisionRef.current ?? undefined,
         })
         savedContentRef.current = content
+        revisionRef.current = saved.revision ?? null
+        setConflict(null)
         setLastSavedAt(new Date())
         if (!silent) addToast({ message: '저장되었습니다.', type: 'success' })
       } catch (err) {
+        /*
+         * 409 = 내가 읽은 뒤에 다른 탭·기기에서 저장이 있었다.
+         * 조용히 덮어쓰면 남의(혹은 내 다른 탭의) 글이 흔적 없이 사라진다.
+         * 자동저장을 멈추고 사용자가 고르게 한다.
+         */
+        const stale = staleConflict(err)
+        if (stale) {
+          setConflict(stale)
+          return
+        }
         addToast({ message: errorMessage(err, '저장에 실패했습니다.'), type: 'error' })
       } finally {
         setSaving(false)
@@ -89,9 +128,30 @@ export default function DraftEditPage() {
     [content, draftId, draft, addToast]
   )
 
+  /** 서버가 보낸 현재 내용으로 갈아탄다 (내가 쓰던 것은 버린다). */
+  const acceptRemote = () => {
+    if (!conflict) return
+    setContent(conflict.content)
+    savedContentRef.current = conflict.content
+    revisionRef.current = conflict.revision
+    setConflict(null)
+    addToast({ message: '다른 곳에서 저장한 내용을 불러왔습니다.', type: 'info' })
+  }
+
+  /** 내가 쓰던 것으로 덮어쓴다. */
+  const overwriteRemote = async () => {
+    if (!conflict) return
+    revisionRef.current = conflict.revision
+    setConflict(null)
+    await saveContent(false)
+  }
+
   // 자동 저장 (debounce)
   useEffect(() => {
     if (loading || !draft) return
+    // 충돌이 떠 있는 동안은 자동저장을 멈춘다. 안 그러면 사용자가 고르기도 전에
+    // 다시 시도해서 같은 409 를 반복하거나, 잘못 덮어쓴다.
+    if (conflict) return
 
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
     autoSaveTimerRef.current = setTimeout(() => void saveContent(true), AUTOSAVE_DELAY_MS)
@@ -99,7 +159,7 @@ export default function DraftEditPage() {
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
     }
-  }, [content, loading, draft, saveContent])
+  }, [content, loading, draft, conflict, saveContent])
 
   /** 되돌리기 지점을 남기는 명시적 버전 저장 */
   const handleCreateSnapshot = async () => {
@@ -198,9 +258,9 @@ export default function DraftEditPage() {
 
   if (loading) {
     return (
-      <div className="bg-canvas min-h-screen flex items-center justify-center">
+      <div className="bg-bg min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="motion-safe:animate-spin motion-reduce:animate-pulse rounded-full h-12 w-12 border-2 border-line border-t-ink mx-auto mb-4"></div>
+          <div className="motion-safe:animate-spin motion-reduce:animate-pulse rounded-full h-12 w-12 border-2 border-border border-t-ink mx-auto mb-4"></div>
           <p className="text-ink-muted">로딩 중...</p>
         </div>
       </div>
@@ -209,7 +269,7 @@ export default function DraftEditPage() {
 
   if (!draft) {
     return (
-      <div className="bg-canvas min-h-screen flex items-center justify-center">
+      <div className="bg-bg min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-ink-muted mb-4">Draft를 찾을 수 없습니다.</p>
           <Link href="/dashboard" className="text-ink-muted hover:text-ink transition-colors">
@@ -221,7 +281,7 @@ export default function DraftEditPage() {
   }
 
   return (
-    <div className="bg-canvas min-h-screen">
+    <div className="bg-bg min-h-screen">
       <div className="max-w-[1400px] mx-auto px-[5%] py-12">
         <div className="mb-8 flex justify-between items-start">
           <div>
@@ -241,7 +301,7 @@ export default function DraftEditPage() {
             <button
               onClick={() => void saveContent(false)}
               disabled={saving}
-              className="px-6 py-3 bg-surface border border-black/10 text-ink rounded-full hover:bg-canvas transition-colors font-semibold disabled:opacity-50"
+              className="px-6 py-3 bg-surface border border-border text-ink rounded-full hover:bg-bg transition-colors font-semibold disabled:opacity-50"
             >
               저장
             </button>
@@ -249,7 +309,7 @@ export default function DraftEditPage() {
               onClick={handleCreateSnapshot}
               disabled={snapshotting}
               title="현재 내용을 되돌리기 지점으로 남깁니다"
-              className="px-6 py-3 bg-accent text-ink rounded-full motion-safe:hover:scale-105 transition-transform font-semibold disabled:bg-gray-300"
+              className="px-6 py-3 bg-ink text-bg rounded-full transition-opacity hover:opacity-85 font-semibold disabled:opacity-50"
             >
               {snapshotting ? '저장 중...' : '버전 남기기'}
             </button>
@@ -257,13 +317,13 @@ export default function DraftEditPage() {
         </div>
 
         {/* Tabs */}
-        <div className="bg-surface rounded-[32px] border border-black/5 mb-8 overflow-hidden">
-          <div className="flex border-b border-black/10 overflow-x-auto">
+        <div className="bg-surface rounded-lg border border-border-subtle mb-8 overflow-hidden">
+          <div className="flex border-b border-border overflow-x-auto">
             <button
               onClick={() => setActiveTab('content')}
               className={`px-6 py-5 font-semibold transition-colors whitespace-nowrap ${
                 activeTab === 'content'
-                  ? 'text-ink border-b-2 border-accent-ink'
+                  ? 'text-ink border-b-2 border-accent'
                   : 'text-ink-muted hover:text-ink'
               }`}
             >
@@ -273,7 +333,7 @@ export default function DraftEditPage() {
               onClick={() => setActiveTab('transform')}
               className={`px-6 py-5 font-semibold transition-colors whitespace-nowrap ${
                 activeTab === 'transform'
-                  ? 'text-ink border-b-2 border-accent-ink'
+                  ? 'text-ink border-b-2 border-accent'
                   : 'text-ink-muted hover:text-ink'
               }`}
             >
@@ -283,7 +343,7 @@ export default function DraftEditPage() {
               onClick={() => setActiveTab('versions')}
               className={`px-6 py-5 font-semibold transition-colors whitespace-nowrap ${
                 activeTab === 'versions'
-                  ? 'text-ink border-b-2 border-accent-ink'
+                  ? 'text-ink border-b-2 border-accent'
                   : 'text-ink-muted hover:text-ink'
               }`}
             >
@@ -293,17 +353,27 @@ export default function DraftEditPage() {
               onClick={() => setActiveTab('safety')}
               className={`px-6 py-5 font-semibold transition-colors whitespace-nowrap ${
                 activeTab === 'safety'
-                  ? 'text-ink border-b-2 border-accent-ink'
+                  ? 'text-ink border-b-2 border-accent'
                   : 'text-ink-muted hover:text-ink'
               }`}
             >
               Safety
             </button>
             <button
+              onClick={() => setActiveTab('publish')}
+              className={`px-6 py-5 font-semibold transition-colors whitespace-nowrap ${
+                activeTab === 'publish'
+                  ? 'text-ink border-b-2 border-accent'
+                  : 'text-ink-muted hover:text-ink'
+              }`}
+            >
+              발행
+            </button>
+            <button
               onClick={() => setActiveTab('export')}
               className={`px-6 py-5 font-semibold transition-colors whitespace-nowrap ${
                 activeTab === 'export'
-                  ? 'text-ink border-b-2 border-accent-ink'
+                  ? 'text-ink border-b-2 border-accent'
                   : 'text-ink-muted hover:text-ink'
               }`}
             >
@@ -312,37 +382,85 @@ export default function DraftEditPage() {
           </div>
         </div>
 
+        {conflict && (
+          <div
+            role="alert"
+            className="mb-6 rounded border border-warning/40 bg-warning/10 p-6"
+          >
+            <h2 className="text-lg font-bold text-ink">다른 곳에서 이 글을 먼저 저장했습니다</h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+              다른 탭이나 기기에서 저장한 내용이 있습니다. 그대로 저장하면 그 내용이
+              사라집니다. 어느 쪽을 남길지 골라주세요.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => void overwriteRemote()}
+                className="inline-flex min-h-touch items-center rounded bg-ink px-5 text-sm font-bold text-bg transition-opacity hover:opacity-85"
+              >
+                내가 쓴 것으로 덮어쓰기
+              </button>
+              <button
+                type="button"
+                onClick={acceptRemote}
+                className="inline-flex min-h-touch items-center rounded border border-border bg-surface px-5 text-sm font-bold text-ink transition-colors hover:bg-bg"
+              >
+                저쪽 내용 불러오기
+              </button>
+            </div>
+            <details className="mt-5">
+              <summary className="cursor-pointer text-sm font-medium text-ink-muted hover:text-ink">
+                저쪽 내용 미리보기
+              </summary>
+              <pre className="mt-3 max-h-64 overflow-auto rounded bg-bg p-4 text-xs leading-relaxed text-ink-muted">
+                {conflict.content}
+              </pre>
+            </details>
+          </div>
+        )}
+
         {activeTab === 'content' && (
-          <div className="grid lg:grid-cols-2 gap-8">
-            <div className="bg-surface rounded-[32px] border border-black/5 p-8">
-              <div className="flex justify-between items-center mb-6">
+          <div className="grid gap-8 lg:grid-cols-2">
+            <div className="rounded-lg border border-border-subtle bg-surface p-8">
+              <div className="mb-6 flex items-center justify-between">
                 <h2 className="text-2xl font-bold text-ink">Markdown 에디터</h2>
                 {saving && <span className="text-sm text-ink-muted">저장 중...</span>}
               </div>
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                className="w-full h-[600px] p-6 border border-black/10 rounded-2xl font-mono text-sm bg-canvas resize-none"
-              />
+              <div className="h-[600px]">
+                <MarkdownEditor
+                  value={content}
+                  onChange={setContent}
+                  onScrollRatio={syncPreviewScroll}
+                />
+              </div>
             </div>
-            <div className="bg-surface rounded-[32px] border border-black/5 p-8">
-              <h2 className="text-2xl font-bold mb-6 text-ink">Preview</h2>
-              <div className="w-full h-[600px] p-6 border border-black/10 rounded-2xl overflow-y-auto prose max-w-none bg-canvas">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+            <div className="rounded-lg border border-border-subtle bg-surface p-8">
+              <h2 className="mb-6 text-2xl font-bold text-ink">Preview</h2>
+              <div
+                ref={previewRef}
+                className="prose h-[600px] w-full max-w-none overflow-y-auto rounded border border-border bg-bg p-6"
+              >
+                {/* 공개 페이지와 같은 렌더러를 쓴다. 미리보기가 실제와 다르면 미리보기가 아니다. */}
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[[rehypeHighlight, { detect: false, ignoreMissing: true }]]}
+                >
+                  {content}
+                </ReactMarkdown>
               </div>
             </div>
           </div>
         )}
 
         {activeTab === 'transform' && (
-          <div className="bg-surface rounded-[32px] border border-black/5 p-8">
+          <div className="bg-surface rounded-lg border border-border-subtle p-8">
             <h2 className="text-2xl font-bold mb-6 text-ink">변형 기능</h2>
             <p className="text-ink-muted mb-8">초안을 원하는 방향으로 변형할 수 있습니다.</p>
             <div className="grid md:grid-cols-2 gap-4">
               <button
                 onClick={() => handleTransform('shorten')}
                 disabled={Boolean(transformJobId)}
-                className="p-6 bg-canvas rounded-2xl border border-black/10 hover:bg-accent hover:border-accent transition-colors disabled:opacity-50"
+                className="p-6 bg-bg rounded border border-border hover:bg-accent hover:border-accent transition-colors disabled:opacity-50"
               >
                 <h3 className="font-bold text-lg text-ink mb-2">더 짧게</h3>
                 <p className="text-sm text-ink-muted">내용을 간결하게 요약합니다.</p>
@@ -350,7 +468,7 @@ export default function DraftEditPage() {
               <button
                 onClick={() => handleTransform('expand')}
                 disabled={Boolean(transformJobId)}
-                className="p-6 bg-canvas rounded-2xl border border-black/10 hover:bg-accent hover:border-accent transition-colors disabled:opacity-50"
+                className="p-6 bg-bg rounded border border-border hover:bg-accent hover:border-accent transition-colors disabled:opacity-50"
               >
                 <h3 className="font-bold text-lg text-ink mb-2">더 길게</h3>
                 <p className="text-sm text-ink-muted">내용을 더 자세하게 확장합니다.</p>
@@ -358,7 +476,7 @@ export default function DraftEditPage() {
               <button
                 onClick={() => handleTransform('simplify')}
                 disabled={Boolean(transformJobId)}
-                className="p-6 bg-canvas rounded-2xl border border-black/10 hover:bg-accent hover:border-accent transition-colors disabled:opacity-50"
+                className="p-6 bg-bg rounded border border-border hover:bg-accent hover:border-accent transition-colors disabled:opacity-50"
               >
                 <h3 className="font-bold text-lg text-ink mb-2">쉽게</h3>
                 <p className="text-sm text-ink-muted">초보자도 이해하기 쉽게 작성합니다.</p>
@@ -366,7 +484,7 @@ export default function DraftEditPage() {
               <button
                 onClick={() => handleTransform('deepen')}
                 disabled={Boolean(transformJobId)}
-                className="p-6 bg-canvas rounded-2xl border border-black/10 hover:bg-accent hover:border-accent transition-colors disabled:opacity-50"
+                className="p-6 bg-bg rounded border border-border hover:bg-accent hover:border-accent transition-colors disabled:opacity-50"
               >
                 <h3 className="font-bold text-lg text-ink mb-2">더 딥하게</h3>
                 <p className="text-sm text-ink-muted">더 전문적이고 깊이 있게 작성합니다.</p>
@@ -376,7 +494,7 @@ export default function DraftEditPage() {
         )}
 
         {activeTab === 'versions' && (
-          <div className="bg-surface rounded-[32px] border border-black/5 p-8">
+          <div className="bg-surface rounded-lg border border-border-subtle p-8">
             <h2 className="text-2xl font-bold mb-6 text-ink">버전 히스토리</h2>
             {versions.length === 0 ? (
               <div className="text-center py-12">
@@ -387,7 +505,7 @@ export default function DraftEditPage() {
                 {versions.map((version, index) => (
                   <div
                     key={version.id}
-                    className="p-6 border border-black/10 rounded-2xl hover:bg-canvas transition-colors"
+                    className="p-6 border border-border rounded hover:bg-bg transition-colors"
                   >
                     <div className="flex justify-between items-start mb-4">
                       <div>
@@ -401,7 +519,7 @@ export default function DraftEditPage() {
                         </p>
                       </div>
                       {index === 0 && (
-                        <span className="px-4 py-2 bg-accent text-ink rounded-full text-xs font-semibold">
+                        <span className="px-4 py-2 bg-ink text-bg rounded-full text-xs font-semibold">
                           최신
                         </span>
                       )}
@@ -423,21 +541,21 @@ export default function DraftEditPage() {
         )}
 
         {activeTab === 'safety' && (
-          <div className="bg-surface rounded-[32px] border border-black/5 p-8">
+          <div className="bg-surface rounded-lg border border-border-subtle p-8">
             <div className="flex justify-between items-center mb-8">
               <h2 className="text-2xl font-bold text-ink">Safety 검사</h2>
               <button
                 onClick={handleScan}
                 disabled={scanning}
-                className="px-8 py-4 bg-red-600 text-canvas rounded-full motion-safe:hover:scale-105 transition-transform font-semibold disabled:bg-gray-300"
+                className="px-6 py-3 bg-danger text-bg rounded transition-opacity hover:opacity-85 font-semibold disabled:opacity-50"
               >
                 {scanning ? '검사 중...' : '검사 실행'}
               </button>
             </div>
 
             {findings.length === 0 ? (
-              <div className="p-12 bg-accent/20 border border-accent/30 rounded-2xl text-center">
-                <svg className="w-16 h-16 text-accent-ink mx-auto mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="p-12 bg-accent/20 border border-accent/30 rounded text-center">
+                <svg className="w-16 h-16 text-accent-text mx-auto mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <p className="text-ink font-semibold text-lg">민감정보가 발견되지 않았습니다.</p>
@@ -445,25 +563,25 @@ export default function DraftEditPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="p-6 bg-amber-50 border border-amber-200 rounded-2xl">
-                  <p className="flex items-center gap-2 text-amber-900 font-semibold">
+                <div className="p-6 bg-warning/10 border border-warning/30 rounded">
+                  <p className="flex items-center gap-2 text-warning font-semibold">
                     <AlertIcon className="w-5 h-5" />
                     {findings.length}개의 민감정보가 발견되었습니다.
                   </p>
                 </div>
                 {findings.map((finding) => (
-                  <div key={finding.id} className="p-6 border border-black/10 rounded-2xl hover:bg-canvas transition-colors">
+                  <div key={finding.id} className="p-6 border border-border rounded hover:bg-bg transition-colors">
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <div className="flex items-center gap-3 mb-3">
                           <span className={`px-4 py-2 rounded-full text-xs font-semibold ${
-                            finding.severity === 'high' ? 'bg-red-100 text-red-700' :
-                            finding.severity === 'med' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-blue-100 text-blue-700'
+                            finding.severity === 'high' ? 'bg-danger/15 text-danger' :
+                            finding.severity === 'med' ? 'bg-warning/15 text-warning' :
+                            'bg-accent/15 text-accent-text'
                           }`}>
                             {finding.severity}
                           </span>
-                          <span className="px-4 py-2 bg-gray-100 text-ink-muted rounded-full text-xs font-semibold">
+                          <span className="px-4 py-2 bg-surface-2 text-ink-muted rounded-full text-xs font-semibold">
                             {finding.category}
                           </span>
                         </div>
@@ -474,25 +592,25 @@ export default function DraftEditPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleApplyFix(finding.id, 'mask')}
-                          className="px-5 py-2.5 bg-yellow-600 text-canvas rounded-full motion-safe:hover:scale-105 transition-transform text-sm font-semibold"
+                          className="px-4 py-2 bg-warning text-bg rounded transition-opacity hover:opacity-85 text-sm font-semibold"
                         >
                           마스킹
                         </button>
                         <button
                           onClick={() => handleApplyFix(finding.id, 'delete')}
-                          className="px-5 py-2.5 bg-red-600 text-canvas rounded-full motion-safe:hover:scale-105 transition-transform text-sm font-semibold"
+                          className="px-4 py-2 bg-danger text-bg rounded transition-opacity hover:opacity-85 text-sm font-semibold"
                         >
                           삭제
                         </button>
                         <button
                           onClick={() => handleApplyFix(finding.id, 'ignore')}
-                          className="px-5 py-2.5 bg-gray-600 text-canvas rounded-full motion-safe:hover:scale-105 transition-transform text-sm font-semibold"
+                          className="px-4 py-2 bg-ink-muted text-bg rounded transition-opacity hover:opacity-85 text-sm font-semibold"
                         >
                           무시
                         </button>
                       </div>
                     </div>
-                    <pre className="text-sm bg-canvas p-4 rounded-2xl border border-black/10 font-mono overflow-x-auto">
+                    <pre className="text-sm bg-bg p-4 rounded border border-border font-mono overflow-x-auto">
                       {finding.snippet}
                     </pre>
                   </div>
@@ -502,25 +620,27 @@ export default function DraftEditPage() {
           </div>
         )}
 
+        {activeTab === 'publish' && <PublishPanel draftId={draftId} />}
+
         {activeTab === 'export' && (
-          <div className="bg-surface rounded-[32px] border border-black/5 p-8">
+          <div className="bg-surface rounded-lg border border-border-subtle p-8">
             <h2 className="text-2xl font-bold mb-8 text-ink">Export</h2>
             <div className="space-y-4 max-w-md">
               <button
                 onClick={handleCopyMarkdown}
-                className="w-full inline-flex items-center justify-center gap-2 px-8 py-5 bg-accent text-ink rounded-full motion-safe:hover:scale-105 transition-transform font-semibold text-lg"
+                className="w-full inline-flex items-center justify-center gap-2 px-8 py-5 bg-ink text-bg rounded-full transition-opacity hover:opacity-85 font-semibold text-lg"
               >
                 <ClipboardIcon className="w-5 h-5" />
                 Copy Markdown
               </button>
               <button
                 onClick={handleDownloadMarkdown}
-                className="w-full inline-flex items-center justify-center gap-2 px-8 py-5 bg-ink text-canvas rounded-full motion-safe:hover:scale-105 transition-transform font-semibold text-lg"
+                className="w-full inline-flex items-center justify-center gap-2 px-8 py-5 bg-ink text-bg rounded-full transition-opacity hover:opacity-85 font-semibold text-lg"
               >
                 <DownloadIcon className="w-5 h-5" />
                 Download .md
               </button>
-              <div className="p-6 bg-canvas rounded-2xl border border-black/10">
+              <div className="p-6 bg-bg rounded border border-border">
                 <p className="text-sm text-ink-muted">
                   마크다운 파일을 다운로드하거나 클립보드에 복사할 수 있습니다.
                 </p>

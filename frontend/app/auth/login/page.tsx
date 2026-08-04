@@ -69,9 +69,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="bg-canvas min-h-screen flex items-center justify-center px-[5%]">
+    <div className="bg-bg min-h-screen flex items-center justify-center px-[5%]">
       <div className="max-w-md w-full">
-        <div className="bg-surface rounded-[32px] border border-black/5 p-10">
+        <div className="bg-surface rounded-lg border border-border-subtle p-10">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-ink mb-3 tracking-tight">
               {isSignUp ? '회원가입' : '로그인'}
@@ -95,7 +95,7 @@ export default function LoginPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  className="w-full p-4 border border-black/10 rounded-2xl bg-canvas"
+                  className="w-full p-4 border border-border rounded bg-bg"
                   placeholder="이름을 입력하세요"
                 />
               </div>
@@ -113,7 +113,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full p-4 border border-black/10 rounded-2xl bg-canvas"
+                className="w-full p-4 border border-border rounded bg-bg"
                 placeholder="email@example.com"
               />
             </div>
@@ -131,21 +131,21 @@ export default function LoginPage() {
                 required
                 // 백엔드 회원가입 정책과 동일하게 8자 이상
                 minLength={isSignUp ? 8 : undefined}
-                className="w-full p-4 border border-black/10 rounded-2xl bg-canvas"
+                className="w-full p-4 border border-border rounded bg-bg"
                 placeholder={isSignUp ? '8자 이상 입력하세요' : '비밀번호를 입력하세요'}
               />
             </div>
 
             {error && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-2xl">
-                <p className="text-red-700 text-sm">{error}</p>
+              <div className="p-4 bg-danger/10 border border-danger/30 rounded">
+                <p className="text-danger text-sm">{error}</p>
               </div>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-8 py-5 bg-accent text-ink rounded-full motion-safe:hover:scale-105 transition-transform font-semibold text-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="w-full px-8 py-5 bg-ink text-bg rounded-full transition-opacity hover:opacity-85 font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? '처리 중...' : isSignUp ? '회원가입' : '로그인'}
             </button>
@@ -163,7 +163,19 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <div className="mt-8 pt-8 border-t border-black/10">
+          {/* 로그인 화면에만 둔다. 회원가입 중에는 재설정할 비밀번호가 없다. */}
+          {!isSignUp && (
+            <div className="mt-2 text-center">
+              <Link
+                href="/auth/forgot"
+                className="inline-flex min-h-touch items-center px-2 text-sm text-ink-muted transition-colors hover:text-ink"
+              >
+                비밀번호를 잊으셨나요?
+              </Link>
+            </div>
+          )}
+
+          <div className="mt-8 pt-8 border-t border-border">
             <Link
               href="/"
               className="flex items-center justify-center min-h-touch text-ink-muted hover:text-ink transition-colors text-sm"

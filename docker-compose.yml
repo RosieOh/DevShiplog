@@ -32,7 +32,32 @@ services:
       timeout: 5s
       retries: 5
 
+  # 업로드 이미지 저장소.
+  #
+  # 로컬 디스크를 쓰지 않는 이유: 서버를 2대 이상 띄우면 A 에 올린 파일을 B 가 못 찾고,
+  # 컨테이너를 재배포하면 사라진다. MinIO 는 S3 와 API 가 같아서 개발과 운영이
+  # 같은 코드로 돌고, 나중에 AWS 로 옮길 때 엔드포인트만 비우면 된다.
+  minio:
+    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+    container_name: devshiplog-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: devshiplog
+      MINIO_ROOT_PASSWORD: devshiplog1234
+    ports:
+      - "9000:9000"  # S3 API
+      - "9001:9001"  # 웹 콘솔
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      # /minio/health/live 는 인증 없이 열려 있다.
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   mariadb_data:
   redis_data:
+  minio_data:
 
