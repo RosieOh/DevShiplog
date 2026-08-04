@@ -59,16 +59,25 @@ class PublishRequest(BaseModel):
     @field_validator("cover_url")
     @classmethod
     def _cover_must_be_safe(cls, value: Optional[str]) -> Optional[str]:
-        """커버 주소는 우리 업로드 경로이거나 https 여야 한다.
+        """커버 주소는 우리 저장소이거나 https 여야 한다.
 
         클라이언트가 보낸 문자열이 그대로 <img src> 와 og:image 에 들어간다.
         검사하지 않으면 javascript:/data: 스킴이나 남의 추적 픽셀을 우리 글에 심을 수 있다.
+
+        허용 목록은 세 가지다.
+        - 우리 오브젝트 저장소 주소 (MinIO/S3). 개발에서는 http://localhost:9000/... 이라
+          https 만 허용하면 자기 업로드가 거절된다.
+        - 로컬 백엔드의 /uploads/... 경로
+        - 그 외 외부 이미지는 https 만 (평문 http 는 혼합 콘텐츠로 차단된다)
         """
         if value is None or value == "":
             return None
-        if value.startswith(f"{settings.UPLOAD_PUBLIC_PREFIX.rstrip('/')}/") or value.startswith(
-            "https://"
-        ):
+
+        allowed_prefixes = [f"{settings.UPLOAD_PUBLIC_PREFIX.rstrip('/')}/"]
+        if settings.STORAGE_PUBLIC_BASE_URL:
+            allowed_prefixes.append(f"{settings.STORAGE_PUBLIC_BASE_URL.rstrip('/')}/")
+
+        if any(value.startswith(p) for p in allowed_prefixes) or value.startswith("https://"):
             return value
         raise ValueError("커버 이미지 주소가 올바르지 않습니다.")
 
