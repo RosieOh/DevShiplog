@@ -27,4 +27,26 @@ celery_app.conf.update(
     # 워커가 죽어도 작업을 잃지 않도록 ack 를 작업 완료 후로 미룬다.
     task_acks_late=True,
     worker_prefetch_multiplier=1,
+    #
+    # 브로커가 죽었을 때 빨리 실패한다.
+    #
+    # 기본값은 무한 재시도라, Redis 가 내려가면 `.delay()` 를 부른 API 요청이
+    # 응답을 못 하고 매달린다. 큐에 넣지 못한 것은 사실이고, 사용자에게는
+    # "지금은 안 된다" 를 바로 알려주는 편이 낫다 (재시도는 사용자가 정한다).
+    broker_connection_retry_on_startup=True,
+    broker_transport_options={
+        "socket_connect_timeout": 2,
+        "socket_timeout": 2,
+        "max_retries": 2,
+        "interval_start": 0,
+        "interval_step": 0.2,
+        "interval_max": 0.5,
+    },
+    # 발행(.delay) 자체의 재시도 정책. 위 옵션과 별개로 지정해야 한다.
+    task_publish_retry_policy={
+        "max_retries": 2,
+        "interval_start": 0,
+        "interval_step": 0.2,
+        "interval_max": 0.5,
+    },
 )
