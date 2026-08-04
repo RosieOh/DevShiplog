@@ -89,20 +89,20 @@ export default function PrivacyPage() {
             <h2 className="text-2xl font-bold text-ink mb-4">제5조 (개인정보처리의 위탁)</h2>
             <div className="space-y-3 text-ink-muted leading-relaxed">
               <p>1. 회사는 원활한 개인정보 업무처리를 위하여 다음과 같이 개인정보 처리업무를 위탁하고 있습니다:</p>
-              <div className="bg-canvas p-6 rounded-[20px] mt-4">
+              <div className="bg-bg p-6 rounded-[20px] mt-4">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-line">
+                    <tr className="border-b border-border">
                       <th className="text-left py-3 text-ink font-semibold">위탁업체</th>
                       <th className="text-left py-3 text-ink font-semibold">위탁업무 내용</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr className="border-b border-line">
+                    <tr className="border-b border-border">
                       <td className="py-3">클라우드 서비스 제공업체</td>
                       <td className="py-3">서버 운영 및 데이터 저장</td>
                     </tr>
-                    <tr className="border-b border-line">
+                    <tr className="border-b border-border">
                       <td className="py-3">결제 대행업체</td>
                       <td className="py-3">결제 처리 (유료 서비스 시)</td>
                     </tr>
@@ -152,7 +152,7 @@ export default function PrivacyPage() {
             <div className="space-y-3 text-ink-muted leading-relaxed">
               <p>1. 회사는 개인정보 처리에 관한 업무를 총괄해서 책임지고, 개인정보 처리와 관련한 정보주체의 불만처리 및 피해구제 등을 위하여 
                  아래와 같이 개인정보 보호책임자를 지정하고 있습니다.</p>
-              <div className="bg-canvas p-6 rounded-[20px] mt-4">
+              <div className="bg-bg p-6 rounded-[20px] mt-4">
                 <p className="mb-2"><strong className="text-ink">개인정보 보호책임자</strong></p>
                 <p>이메일: privacy@devshiplog.com</p>
                 <p className="mt-4 mb-2"><strong className="text-ink">개인정보 보호 담당부서</strong></p>
@@ -182,7 +182,7 @@ export default function PrivacyPage() {
           </section>
         </div>
 
-        <div className="mt-16 pt-8 border-t border-line">
+        <div className="mt-16 pt-8 border-t border-border">
           <p className="text-ink-muted text-sm">
             본 개인정보처리방침에 대한 문의사항이 있으시면 다음 연락처로 문의해 주시기 바랍니다.
           </p>

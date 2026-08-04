@@ -47,6 +47,9 @@ class SaveContentRequest(BaseModel):
 
     content_md: str
     meta_json: Optional[Dict[str, Any]] = None
+    # 클라이언트가 마지막으로 받은 revision. 보내면 낙관적 잠금이 걸린다.
+    # 생략하면 기존처럼 무조건 덮어쓴다 (기존 클라이언트 호환).
+    base_revision: Optional[int] = None
 
 
 class CreateVersionRequest(BaseModel):
@@ -54,6 +57,9 @@ class CreateVersionRequest(BaseModel):
 
     content_md: str
     meta_json: Optional[Dict[str, Any]] = None
+    # 클라이언트가 마지막으로 받은 revision. 보내면 낙관적 잠금이 걸린다.
+    # 생략하면 기존처럼 무조건 덮어쓴다 (기존 클라이언트 호환).
+    base_revision: Optional[int] = None
 
 
 def _version_payload(version) -> Optional[Dict[str, Any]]:
@@ -66,6 +72,7 @@ def _version_payload(version) -> Optional[Dict[str, Any]]:
         "meta_json": version.meta_json,
         "created_at": version.created_at.isoformat() if version.created_at else None,
         "updated_at": version.updated_at.isoformat() if version.updated_at else None,
+        "revision": version.revision or 1,
     }
 
 
@@ -162,6 +169,7 @@ def save_draft_content(
         version_id=latest.id,
         content_md=request.content_md,
         meta_json=request.meta_json,
+        expected_revision=request.base_revision,
     )
     return _version_payload(updated)
 

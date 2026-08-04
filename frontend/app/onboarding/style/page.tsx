@@ -80,7 +80,7 @@ export default function StyleOnboardingPage() {
   }
 
   return (
-    <div className="bg-canvas min-h-screen">
+    <div className="bg-bg min-h-screen">
       <div className="max-w-[1400px] mx-auto px-[5%] py-16">
         <div className="max-w-2xl mx-auto">
           <div className="mb-12">
@@ -93,7 +93,7 @@ export default function StyleOnboardingPage() {
             </p>
           </div>
 
-          <div className="bg-surface rounded-[32px] border border-black/5 p-10">
+          <div className="bg-surface rounded-lg border border-border-subtle p-10">
             <div className="space-y-8">
               <div>
                 <label htmlFor="blog-url" className="block text-sm font-semibold text-ink mb-3">
@@ -108,7 +108,7 @@ export default function StyleOnboardingPage() {
                   value={blogUrl}
                   onChange={(e) => setBlogUrl(e.target.value)}
                   placeholder="https://velog.io/@username 또는 https://blog.example.com"
-                  className="w-full p-5 border border-black/10 rounded-2xl bg-canvas"
+                  className="w-full p-5 border border-border rounded bg-bg"
                 />
                 <p id="blog-url-hint" className="text-sm text-ink-muted mt-3">
                   지원 플랫폼: Velog, Tistory, Medium, WordPress, 기타 RSS 지원 블로그
@@ -128,14 +128,14 @@ export default function StyleOnboardingPage() {
                   onChange={(e) => setSampleCount(parseInt(e.target.value) || 5)}
                   min={1}
                   max={20}
-                  className="w-full p-5 border border-black/10 rounded-2xl bg-canvas"
+                  className="w-full p-5 border border-border rounded bg-bg"
                 />
                 <p id="sample-count-hint" className="text-sm text-ink-muted mt-3">
                   기본: 5개, 최대: 20개 (더 많은 샘플일수록 정확도가 높아집니다)
                 </p>
               </div>
 
-              <div className="p-6 bg-accent/20 border border-accent/30 rounded-2xl">
+              <div className="p-6 bg-accent/20 border border-accent/30 rounded">
                 <h3 className="font-semibold text-ink mb-4">분석 항목</h3>
                 <ul className="text-sm text-ink space-y-2">
                   <li>• 톤 (담백/캐주얼/공식)</li>
@@ -149,16 +149,16 @@ export default function StyleOnboardingPage() {
               <button
                 onClick={handleAnalyze}
                 disabled={loading || !blogUrl.trim()}
-                className="w-full px-8 py-5 bg-accent text-ink rounded-full motion-safe:hover:scale-105 transition-transform font-semibold text-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
+                className="w-full px-8 py-5 bg-ink text-bg rounded-full transition-opacity hover:opacity-85 font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? '분석 중...' : '분석 시작'}
               </button>
 
               {result && (
-                <div className="p-8 bg-accent/20 border border-accent/30 rounded-2xl">
+                <div className="p-8 bg-accent/20 border border-accent/30 rounded">
                   <div className="flex items-start gap-6">
                     <div className="flex-shrink-0">
-                      <svg className="w-10 h-10 text-accent-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-10 h-10 text-accent-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
@@ -183,7 +183,7 @@ export default function StyleOnboardingPage() {
                       </div>
                       <Link
                         href="/dashboard"
-                        className="inline-block px-6 py-3 bg-ink text-canvas rounded-full motion-safe:hover:scale-105 transition-transform font-semibold"
+                        className="inline-block px-6 py-3 bg-ink text-bg rounded-full transition-opacity hover:opacity-85 font-semibold"
                       >
                         Dashboard로 이동
                       </Link>

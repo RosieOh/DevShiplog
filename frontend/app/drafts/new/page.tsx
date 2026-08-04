@@ -207,7 +207,7 @@ export default function NewDraftPage() {
   }, [jobStatus?.status, draftId, draft, loadDraft])
 
   return (
-    <div className="bg-canvas min-h-screen">
+    <div className="bg-bg min-h-screen">
       <div className="max-w-[1400px] mx-auto px-[5%] py-12">
         <div className="mb-8">
           <Link href="/dashboard" className="text-ink-muted hover:text-ink mb-4 inline-block transition-colors">
@@ -219,7 +219,7 @@ export default function NewDraftPage() {
         <div className="grid lg:grid-cols-2 gap-8">
           {/* 좌측: 입력 & 옵션 */}
           <div className="space-y-6">
-            <div className="bg-surface rounded-[32px] border border-black/5 p-8">
+            <div className="bg-surface rounded-lg border border-border-subtle p-8">
               <h2 className="text-2xl font-bold mb-6 text-ink">소스 입력</h2>
               
               <div className="mb-6">
@@ -228,8 +228,8 @@ export default function NewDraftPage() {
                     onClick={() => setSourceType('url')}
                     className={`flex-1 px-4 py-3 rounded-full font-semibold transition-colors ${
                       sourceType === 'url' 
-                        ? 'bg-accent text-ink' 
-                        : 'bg-gray-100 text-ink-muted hover:bg-gray-200'
+                        ? 'bg-ink text-bg' 
+                        : 'bg-surface-2 text-ink-muted hover:bg-gray-200'
                     }`}
                   >
                     URL
@@ -238,8 +238,8 @@ export default function NewDraftPage() {
                     onClick={() => setSourceType('text')}
                     className={`flex-1 px-4 py-3 rounded-full font-semibold transition-colors ${
                       sourceType === 'text' 
-                        ? 'bg-accent text-ink' 
-                        : 'bg-gray-100 text-ink-muted hover:bg-gray-200'
+                        ? 'bg-ink text-bg' 
+                        : 'bg-surface-2 text-ink-muted hover:bg-gray-200'
                     }`}
                   >
                     텍스트/로그
@@ -257,14 +257,14 @@ export default function NewDraftPage() {
                           value={url}
                           onChange={(e) => handleUrlChange(index, e.target.value)}
                           placeholder="https://..."
-                          className="flex-1 p-4 border border-black/10 rounded-2xl bg-canvas"
+                          className="flex-1 p-4 border border-border rounded bg-bg"
                         />
                         {urls.length > 1 && (
                           <button
                             type="button"
                             onClick={() => handleRemoveUrl(index)}
                             aria-label={`소스 URL ${index + 1} 삭제`}
-                            className="px-4 min-h-touch text-red-700 hover:bg-red-50 rounded-2xl transition-colors"
+                            className="px-4 min-h-touch text-danger hover:bg-danger/10 rounded transition-colors"
                           >
                             삭제
                           </button>
@@ -285,21 +285,21 @@ export default function NewDraftPage() {
                     value={text}
                     onChange={(e) => setText(e.target.value)}
                     placeholder="텍스트 또는 로그를 입력하세요..."
-                    className="w-full p-4 border border-black/10 rounded-2xl h-40 bg-canvas resize-none font-mono text-sm"
+                    className="w-full p-4 border border-border rounded h-40 bg-bg resize-none font-mono text-sm"
                   />
                 )}
 
                 <button
                   onClick={handleExtractSources}
                   disabled={extracting}
-                  className="w-full mt-6 px-6 py-4 bg-accent text-ink rounded-full motion-safe:hover:scale-105 transition-transform font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  className="w-full mt-6 px-6 py-4 bg-ink text-bg rounded-full transition-opacity hover:opacity-85 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {extracting ? '추출 중...' : '소스 추출'}
                 </button>
               </div>
 
               {sourceIds.length > 0 && (
-                <div className="p-4 bg-accent/20 border border-accent/30 rounded-2xl">
+                <div className="p-4 bg-accent/20 border border-accent/30 rounded">
                   <p className="flex items-center gap-2 text-ink font-semibold">
                     <CheckCircleIcon className="w-5 h-5" />
                     {sourceIds.length}개의 소스가 준비되었습니다.
@@ -308,7 +308,7 @@ export default function NewDraftPage() {
               )}
             </div>
 
-            <div className="bg-surface rounded-[32px] border border-black/5 p-8">
+            <div className="bg-surface rounded-lg border border-border-subtle p-8">
               <h2 className="text-2xl font-bold mb-6 text-ink">생성 옵션</h2>
               
               <div className="space-y-6">
@@ -318,7 +318,7 @@ export default function NewDraftPage() {
                     id="draft-type"
                     value={draftType}
                     onChange={(e) => setDraftType(e.target.value)}
-                    className="w-full p-4 border border-black/10 rounded-2xl bg-canvas"
+                    className="w-full p-4 border border-border rounded bg-bg"
                   >
                     <option value="troubleshooting">트러블슈팅</option>
                     <option value="implementation">구현기</option>
@@ -334,7 +334,7 @@ export default function NewDraftPage() {
                     id="draft-audience"
                     value={audience}
                     onChange={(e) => setAudience(e.target.value)}
-                    className="w-full p-4 border border-black/10 rounded-2xl bg-canvas"
+                    className="w-full p-4 border border-border rounded bg-bg"
                   >
                     <option value="junior">주니어</option>
                     <option value="intermediate">중급</option>
@@ -349,7 +349,7 @@ export default function NewDraftPage() {
                     id="draft-length"
                     value={length}
                     onChange={(e) => setLength(e.target.value)}
-                    className="w-full p-4 border border-black/10 rounded-2xl bg-canvas"
+                    className="w-full p-4 border border-border rounded bg-bg"
                   >
                     <option value="short">짧게 (800자)</option>
                     <option value="default">기본 (1500~2500자)</option>
@@ -357,13 +357,13 @@ export default function NewDraftPage() {
                   </select>
                 </div>
 
-                <div className="pt-6 border-t border-black/10">
+                <div className="pt-6 border-t border-border">
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={useStyleProfile}
                       onChange={(e) => setUseStyleProfile(e.target.checked)}
-                      className="w-5 h-5 rounded accent-accent-ink"
+                      className="w-5 h-5 rounded accent-accent"
                     />
                     <span className="font-semibold text-ink">내 Style DNA 사용</span>
                   </label>
@@ -372,7 +372,7 @@ export default function NewDraftPage() {
                       <select
                         value={styleProfileId}
                         onChange={(e) => setStyleProfileId(e.target.value)}
-                        className="w-full mt-4 p-4 border border-black/10 rounded-2xl bg-canvas"
+                        className="w-full mt-4 p-4 border border-border rounded bg-bg"
                       >
                         <option value="">스타일 없이 생성</option>
                         {styleProfiles.map((profile) => (
@@ -396,14 +396,14 @@ export default function NewDraftPage() {
             <button
               onClick={handleGenerateDraft}
               disabled={loading || sourceIds.length === 0}
-              className="w-full px-8 py-5 bg-accent text-ink rounded-full motion-safe:hover:scale-105 transition-transform font-semibold text-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="w-full px-8 py-5 bg-ink text-bg rounded-full transition-opacity hover:opacity-85 font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? '생성 중...' : '초안 생성하기'}
             </button>
 
             {error && (
-              <div className="p-6 bg-red-50 border border-red-200 rounded-2xl">
-                <p className="text-red-700 font-semibold">{error}</p>
+              <div className="p-6 bg-danger/10 border border-danger/30 rounded">
+                <p className="text-danger font-semibold">{error}</p>
               </div>
             )}
           </div>
@@ -411,16 +411,16 @@ export default function NewDraftPage() {
           {/* 우측: 결과 */}
           <div className="space-y-6">
             {jobStatus && (
-              <div className="bg-surface rounded-[32px] border border-black/5 p-8">
+              <div className="bg-surface rounded-lg border border-border-subtle p-8">
                 <h2 className="text-2xl font-bold mb-6 text-ink">생성 상태</h2>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-ink-muted">상태</span>
                     <span className={`px-4 py-2 rounded-full text-sm font-semibold ${
-                      jobStatus.status === 'succeeded' ? 'bg-accent text-ink' :
-                      jobStatus.status === 'failed' ? 'bg-red-100 text-red-700' :
-                      jobStatus.status === 'running' ? 'bg-blue-100 text-blue-700' :
-                      'bg-gray-100 text-ink-muted'
+                      jobStatus.status === 'succeeded' ? 'bg-ink text-bg' :
+                      jobStatus.status === 'failed' ? 'bg-danger/15 text-danger' :
+                      jobStatus.status === 'running' ? 'bg-accent/15 text-accent-text' :
+                      'bg-surface-2 text-ink-muted'
                     }`}>
                       {jobStatus.status}
                     </span>
@@ -438,8 +438,8 @@ export default function NewDraftPage() {
                     </div>
                   )}
                   {jobStatus.error_text && (
-                    <div className="p-4 bg-red-50 border border-red-200 rounded-2xl">
-                      <p className="text-red-700 text-sm">{jobStatus.error_text}</p>
+                    <div className="p-4 bg-danger/10 border border-danger/30 rounded">
+                      <p className="text-danger text-sm">{jobStatus.error_text}</p>
                     </div>
                   )}
                 </div>
@@ -447,11 +447,11 @@ export default function NewDraftPage() {
             )}
 
             {(streamingContent || draft?.latest_version) && (
-              <div className="bg-surface rounded-[32px] border border-black/5 p-8">
+              <div className="bg-surface rounded-lg border border-border-subtle p-8">
                 <h2 className="text-2xl font-bold mb-6 text-ink">
                   {streamingContent ? '생성 중...' : '생성된 초안'}
                 </h2>
-                <div className="p-6 bg-canvas rounded-2xl border border-black/5 max-h-96 overflow-y-auto">
+                <div className="p-6 bg-bg rounded border border-border-subtle max-h-96 overflow-y-auto">
                   <pre className="whitespace-pre-wrap text-sm text-ink font-mono">
                     {streamingContent || draft?.latest_version?.content_md || ''}
                   </pre>
@@ -459,7 +459,7 @@ export default function NewDraftPage() {
                 {draftId && !streamingContent && (
                   <Link
                     href={`/drafts/${draftId}/edit`}
-                    className="mt-6 block w-full text-center px-6 py-4 bg-accent text-ink rounded-full motion-safe:hover:scale-105 transition-transform font-semibold"
+                    className="mt-6 block w-full text-center px-6 py-4 bg-ink text-bg rounded-full transition-opacity hover:opacity-85 font-semibold"
                   >
                     에디터에서 열기 →
                   </Link>

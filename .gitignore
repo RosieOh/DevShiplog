@@ -60,3 +60,6 @@ htmlcov/
 
 # TypeScript 빌드 캐시
 tsconfig.tsbuildinfo
+
+# 업로드된 사용자 파일 (운영에서는 S3)
+backend/uploads/
