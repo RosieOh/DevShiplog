@@ -5,8 +5,12 @@ import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
 
 const WEB = process.env.E2E_WEB || 'http://localhost:3001'
-const EMAIL = process.env.EMAIL || 'test@devshiplog.com'
-const PASS = process.env.PASS || 'devshiplog1234'
+/*
+ * 이 스크립트가 쓸 계정은 아래 시드 블록에서 직접 만든다.
+ * 로컬에만 있는 계정에 기대면 CI 의 빈 DB 에서 로그인이 401 로 떨어진다.
+ * EMAIL/PASS 를 주면 그 계정을 쓴다 (기존 계정으로 확인하고 싶을 때).
+ */
+const PASS = process.env.PASS || 'password1234'
 const OUT = new URL('./shots/features', import.meta.url).pathname.replace(/^\//, '')
 fs.mkdirSync(OUT, { recursive: true })
 
@@ -33,8 +37,9 @@ const api = async (method, path, body, token, raw) => {
   try { return [res.status, JSON.parse(text || '{}')] } catch { return [res.status, text] }
 }
 
+const EMAIL = process.env.EMAIL || `thumb${seedStamp}@devshiplog.com`
 const [, seedUser] = await api('POST', '/auth/register', {
-  email: `thumb${seedStamp}@devshiplog.com`, password: 'password1234', name: '썸네일',
+  email: EMAIL, password: PASS, name: '썸네일',
 })
 const seedToken = seedUser.access_token
 await api('PUT', '/profile/me', { handle: `thumb${seedStamp}` }, seedToken)
