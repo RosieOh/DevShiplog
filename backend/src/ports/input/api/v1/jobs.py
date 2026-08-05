@@ -31,6 +31,9 @@ class JobResponse(BaseModel):
     id: str
     status: str  # queued, running, succeeded, failed
     progress: int
+    # 단계별 진행 상황. 긴 생성 작업에서 "지금 어디쯤인지" 를 보여준다.
+    current_step: Optional[str] = None
+    steps: Optional[Dict[str, Any]] = None
     result_ref: Optional[Dict[str, Any]] = None
     error_text: Optional[str] = None
 
@@ -40,6 +43,8 @@ def _job_payload(job) -> Dict[str, Any]:
         "id": job.id,
         "status": job.status.value,
         "progress": job.progress or 0,
+        "current_step": job.current_step,
+        "steps": job.steps,
         "result_ref": job.result_ref,
         "error_text": job.error_text,
     }

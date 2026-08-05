@@ -43,6 +43,14 @@ class TransformDraftRequest(BaseModel):
     transform_type: str  # shorten, expand, simplify, deepen, style_stronger
 
 
+class UpdateDraftRequest(BaseModel):
+    """작성 보조 메타데이터. 본문은 /content 로 따로 저장한다."""
+
+    tags: Optional[List[str]] = Field(default=None, max_length=20)
+    notes: Optional[str] = Field(default=None, max_length=5000)
+    checklist: Optional[List[Dict[str, Any]]] = Field(default=None, max_length=100)
+
+
 class SaveContentRequest(BaseModel):
     """자동저장 — 새 버전을 만들지 않고 최신 버전을 제자리 수정한다."""
 
@@ -85,8 +93,21 @@ def _draft_payload(draft, latest_version) -> Dict[str, Any]:
         "audience": draft.audience,
         "length_preset": draft.length_preset,
         "created_at": draft.created_at.isoformat() if draft.created_at else None,
+        # 작성 보조 메타데이터. 편집 화면이 매번 따로 조회하지 않도록 같이 내려준다.
+        "tags": draft.tags or [],
+        "notes": draft.notes,
+        "checklist": draft.checklist or [],
         "latest_version": _version_payload(latest_version),
     }
+
+
+class UpdateOutlineRequest(BaseModel):
+    outline: dict  # {title_candidates: [], toc: []}
+
+
+class CompareVersionsRequest(BaseModel):
+    version1_id: str
+    version2_id: str
 
 
 @router.get("")
@@ -133,6 +154,38 @@ def get_draft(
     """Draft 조회"""
     draft = get_owned_draft(draft_repo, draft_id, user_id)
     return _draft_payload(draft, draft_repo.get_latest_version(draft_id))
+
+
+@router.patch("/{draft_id}")
+def update_draft(
+    draft_id: str,
+    request: UpdateDraftRequest,
+    user_id: str = Depends(get_current_user_id),
+    draft_repo: DraftRepository = Depends(get_draft_repo),
+):
+    """태그·메모·체크리스트를 갱신한다. 보낸 항목만 바뀐다."""
+    draft = get_owned_draft(draft_repo, draft_id, user_id)
+
+    # exclude_unset 이라야 "빈 값으로 지우기" 와 "안 보냄" 을 구분할 수 있다.
+    changes = request.model_dump(exclude_unset=True)
+    updated = draft_repo.update_metadata(draft.id, **changes)
+    return _draft_payload(updated, draft_repo.get_latest_version(draft_id))
+
+
+@router.delete("/{draft_id}")
+def delete_draft(
+    draft_id: str,
+    user_id: str = Depends(get_current_user_id),
+    draft_repo: DraftRepository = Depends(get_draft_repo),
+):
+    """초안을 지운다.
+
+    이미 발행한 글은 남는다. 발행물은 발행 시점의 스냅샷이고, 초안이 사라진다고
+    독자가 읽던 글이 없어지면 안 된다 (posts.draft_id 는 SET NULL).
+    """
+    get_owned_draft(draft_repo, draft_id, user_id)
+    draft_repo.delete(draft_id)
+    return {"deleted": True}
 
 
 @router.get("/{draft_id}/versions")

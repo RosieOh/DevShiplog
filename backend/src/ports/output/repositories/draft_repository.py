@@ -51,6 +51,16 @@ class DraftRepository(ABC):
         ...
 
     @abstractmethod
+    def update_metadata(self, draft_id: str, **fields) -> "Draft":
+        """태그·메모·체크리스트 같은 작성 보조 값을 갱신한다. 준 것만 바뀐다."""
+        ...
+
+    @abstractmethod
+    def delete(self, draft_id: str) -> None:
+        """초안을 지운다. 이미 발행한 글은 남는다."""
+        ...
+
+    @abstractmethod
     def get_version_by_id(self, version_id: str) -> Optional["DraftVersion"]:
         ...
 
