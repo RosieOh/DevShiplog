@@ -322,10 +322,17 @@ jobs:
           print("대비·오버플로 문제 없음")
           PY
 
-      - name: 실패 시 백엔드 로그
+      - name: 실패 시 로그
         if: failure()
-        working-directory: backend
-        run: tail -100 backend.log || true
+        run: |
+          echo "=== 컨테이너 상태 ==="
+          docker ps --all --format '{{.Names}}	{{.Status}}'
+          echo "=== MinIO ==="
+          docker logs --tail 50 ci-minio || true
+          echo "=== MariaDB ==="
+          docker logs --tail 20 ci-mariadb || true
+          echo "=== 백엔드 ==="
+          tail -120 backend/backend.log || true
 
       - name: 실패 시 화면 보관
         if: failure()
