@@ -260,12 +260,22 @@ jobs:
       - name: 백엔드 기동
         working-directory: backend
         run: |
-          uvicorn src.main:app --host 127.0.0.1 --port 8000 --log-level warning &
+          # 로그를 파일로 남긴다. 실패했을 때 이게 없으면 500 의 원인을 추측하게 된다.
+          uvicorn src.main:app --host 127.0.0.1 --port 8000 --log-level info > backend.log 2>&1 &
           for i in $(seq 1 30); do
             curl -sf http://localhost:8000/health && break
             sleep 2
           done
           curl -sf http://localhost:8000/health
+
+          # 버킷 준비는 기동 시 lifespan 에서 하고, 실패해도 기동을 막지 않는다.
+          # 그래서 여기서 따로 확인하지 않으면 업로드가 500 날 때까지 모른다.
+          python - <<'EOF'
+          from src.infrastructure.external.storage import get_storage
+          storage = get_storage()
+          storage.client.head_bucket(Bucket=storage.bucket)
+          print("버킷 확인:", storage.bucket)
+          EOF
 
       - name: 프론트엔드 빌드·기동
         working-directory: frontend
@@ -311,6 +321,11 @@ jobs:
               raise SystemExit(1)
           print("대비·오버플로 문제 없음")
           PY
+
+      - name: 실패 시 백엔드 로그
+        if: failure()
+        working-directory: backend
+        run: tail -100 backend.log || true
 
       - name: 실패 시 화면 보관
         if: failure()
