@@ -54,7 +54,9 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_schedules_user_id'), 'schedules', ['user_id'])
     op.create_index(op.f('ix_schedules_draft_id'), 'schedules', ['draft_id'])
+    op.create_index(op.f('ix_schedules_scheduled_at'), 'schedules', ['scheduled_at'])
     # 예약 실행 워커가 "지금 보내야 할 것" 을 뽑는 경로.
+    # scheduled_at 단독 인덱스로는 status 필터가 걸리지 않는다.
     op.create_index('ix_schedules_status_time', 'schedules', ['status', 'scheduled_at'])
 
     # 긴 생성 작업에서 "지금 어디쯤인지" 를 보여주기 위한 값.

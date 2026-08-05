@@ -119,6 +119,12 @@ jobs:
         # 모델만 고치고 마이그레이션을 빠뜨리면 배포 후에야 드러난다.
         run: |
           alembic revision --autogenerate -m "drift check" --rev-id drift_check
+          # 파일이 안 만들어졌으면 검사가 돈 것이 아니다.
+          # 이 확인이 없으면 autogenerate 실패가 '어긋남 없음' 으로 새어나간다.
+          if [ ! -f alembic/versions/drift_check_drift_check.py ]; then
+            echo "::error::autogenerate 가 리비전을 만들지 못했습니다 — 검사가 돌지 않았습니다"
+            exit 1
+          fi
           if grep -qE '^\s+op\.(create|drop|add|alter)' alembic/versions/drift_check_*.py; then
             echo "::error::모델과 마이그레이션이 어긋납니다. 아래 변경이 누락되었습니다:"
             grep -E '^\s+op\.' alembic/versions/drift_check_*.py
@@ -167,20 +173,9 @@ jobs:
     # 유닛 테스트가 통과해야 의미가 있다. 먼저 깨지면 여기서 시간 쓸 이유가 없다.
     needs: [backend, frontend]
     services:
-      mariadb:
-        image: mariadb:10.11
-        env:
-          MARIADB_ROOT_PASSWORD: rootpassword
-          MARIADB_DATABASE: devshiplog
-          MARIADB_USER: devshiplog
-          MARIADB_PASSWORD: devshiplog
-        ports: ['3306:3306']
-        # 짧은 한국어 낱말("자바")이 색인되도록 최소 토큰 길이를 2로.
-        # 기본값 3에서는 검색해도 안 나온다.
-        options: >-
-          --health-cmd "healthcheck.sh --connect --innodb_initialized"
-          --health-interval 10s --health-timeout 5s --health-retries 10
-          --innodb-ft-min-token-size=2 --ft-min-word-len=2
+      # MariaDB 는 services 로 띄우지 않는다.
+      # services 의 options 는 `docker create` 에 전달되므로 서버 플래그
+      # (--innodb-ft-min-token-size)를 줄 수 없다. 아래 스텝에서 직접 띄운다.
       redis:
         image: redis:7-alpine
         ports: ['6379:6379']
@@ -238,6 +233,28 @@ jobs:
           node-version: '20'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
+      - name: MariaDB 기동
+        # 전문검색 최소 토큰 길이를 2로 내려야 "자바" 같은 2글자 한국어가 색인된다.
+        # 기본값 3에서는 검색해도 결과가 0이다.
+        run: |
+          docker run -d --name ci-mariadb -p 3306:3306 \
+            -e MARIADB_ROOT_PASSWORD=rootpassword \
+            -e MARIADB_DATABASE=devshiplog \
+            -e MARIADB_USER=devshiplog \
+            -e MARIADB_PASSWORD=devshiplog \
+            mariadb:10.11 --innodb-ft-min-token-size=2 --ft-min-word-len=2
+
+          for i in $(seq 1 40); do
+            docker exec ci-mariadb healthcheck.sh --connect --innodb_initialized && break
+            sleep 3
+          done
+
+          # 플래그가 실제로 먹었는지 확인한다. 안 먹으면 2글자 검색 테스트가
+          # 조용히 0건을 돌려주고, 그건 "검색이 안 된다" 와 구분이 안 된다.
+          docker exec ci-mariadb mariadb -uroot -prootpassword \
+            -e "SHOW VARIABLES LIKE 'innodb_ft_min_token_size';" | grep -q "	2" \
+            || { echo "::error::innodb_ft_min_token_size 가 2가 아닙니다"; exit 1; }
 
       - name: 백엔드 의존성
         working-directory: backend

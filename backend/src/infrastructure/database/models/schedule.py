@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, ForeignKey, DateTime, Enum, Text
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Index, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
@@ -28,4 +28,10 @@ class Schedule(Base):
     # Relationships
     user = relationship("User", back_populates="schedules")
     draft = relationship("Draft", back_populates="schedules")
+
+    __table_args__ = (
+        # 예약 실행 워커가 "지금 보내야 할 것" 을 뽑는 경로.
+        # scheduled_at 단독 인덱스로는 status 필터가 걸리지 않는다.
+        Index("ix_schedules_status_time", "status", "scheduled_at"),
+    )
 
