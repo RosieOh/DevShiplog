@@ -29,6 +29,9 @@ class JobRepository(ABC):
         job_id: str,
         status: Optional[JobStatus] = None,
         progress: Optional[int] = None,
+        # 단계별 진행 상황. 긴 작업에서 "지금 어디쯤인지" 를 보여주기 위한 값이다.
+        current_step: Optional[str] = None,
+        steps: Optional[dict] = None,
         result_ref: Optional[dict] = None,
         error_text: Optional[str] = None,
     ) -> "Job":

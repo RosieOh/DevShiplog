@@ -1,0 +1,9 @@
+{
+  "name": "devshiplog-e2e",
+  "private": true,
+  "type": "module",
+  "description": "브라우저 검증. 실제 Chrome 을 띄워 화면 동작과 접근성을 본다.",
+  "dependencies": {
+    "puppeteer-core": "^25.4.0"
+  }
+}
