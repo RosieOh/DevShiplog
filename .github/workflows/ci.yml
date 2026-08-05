@@ -247,6 +247,30 @@ jobs:
             -e "SHOW VARIABLES LIKE 'innodb_ft_min_token_size';" | grep -q "	2" \
             || { echo "::error::innodb_ft_min_token_size 가 2가 아닙니다"; exit 1; }
 
+          # MinIO 도 `server /data` 명령이 필요해 services 로는 띄울 수 없다.
+          # 버킷은 백엔드가 기동하면서 만든다.
+          mkdir -p "$RUNNER_TEMP/minio-data"
+          docker run -d --name ci-minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=devshiplog \
+            -e MINIO_ROOT_PASSWORD=devshiplog1234 \
+            -v "$RUNNER_TEMP/minio-data:/data" \
+            minio/minio:RELEASE.2024-10-13T13-34-11Z server /data
+
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:9000/minio/health/live > /dev/null && break
+            sleep 2
+          done
+
+          # 뜬 직후가 아니라 '계속' 살아 있는지 본다.
+          sleep 5
+          docker ps --all --filter name=ci-minio --format '{{.Names}} {{.Status}}'
+          if ! docker ps --filter name=ci-minio --filter status=running --quiet | grep -q .; then
+            echo "::error::MinIO 가 떠 있지 않습니다"
+            docker logs ci-minio
+            exit 1
+          fi
+          curl -sf http://localhost:9000/minio/health/live > /dev/null
+
       - name: 백엔드 의존성
         working-directory: backend
         run: |
