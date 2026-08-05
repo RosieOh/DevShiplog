@@ -13,6 +13,8 @@ from src.infrastructure.database.models.draft_version import DraftVersion
 from src.infrastructure.database.models.risk_finding import RiskFinding
 from src.infrastructure.database.models.job import Job
 from src.infrastructure.database.models.usage_log import UsageLog
+from src.infrastructure.database.models.template import Template
+from src.infrastructure.database.models.schedule import Schedule
 
 # --- 블로그 플랫폼 ---------------------------------------------------------
 from src.infrastructure.database.models.post import Post
@@ -32,6 +34,8 @@ __all__ = [
     "RiskFinding",
     "Job",
     "UsageLog",
+    "Template",
+    "Schedule",
     "Post",
     "Tag",
     "PostTag",

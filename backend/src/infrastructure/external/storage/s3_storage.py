@@ -74,11 +74,26 @@ class S3StorageService(StorageService):
                 # 403 이면 남의 버킷이거나 자격증명이 틀렸다. 조용히 덮지 않는다.
                 raise
 
-        self.client.create_bucket(Bucket=self.bucket)
+        """
+        us-east-1 만 LocationConstraint 를 받지 않는다. 다른 리전은 반드시 줘야 하고,
+        us-east-1 에 주면 InvalidLocationConstraint 로 거절된다. AWS 의 오래된 예외다.
+
+        MinIO 는 리전을 us-east-1 로 쓰기 때문에 이 분기 없이도 동작했다.
+        실제 AWS 리전(ap-northeast-2 등)에서만 드러난다.
+        """
+        region = settings.STORAGE_S3_REGION or "us-east-1"
+        if region == "us-east-1":
+            self.client.create_bucket(Bucket=self.bucket)
+        else:
+            self.client.create_bucket(
+                Bucket=self.bucket,
+                CreateBucketConfiguration={"LocationConstraint": region},
+            )
+
         self.client.put_bucket_policy(
             Bucket=self.bucket, Policy=_PUBLIC_READ_POLICY % self.bucket
         )
-        logger.info("오브젝트 저장소 버킷 생성: %s", self.bucket)
+        logger.info("오브젝트 저장소 버킷 생성: %s (%s)", self.bucket, region)
 
     def put(self, key: str, data: bytes, content_type: str) -> str:
         self.client.put_object(

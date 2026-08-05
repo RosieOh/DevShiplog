@@ -39,6 +39,8 @@ class User(Base):
     drafts = relationship("Draft", back_populates="user", cascade="all, delete-orphan")
     jobs = relationship("Job", back_populates="user", cascade="all, delete-orphan")
     usage_logs = relationship("UsageLog", back_populates="user", cascade="all, delete-orphan")
+    templates = relationship("Template", back_populates="user", cascade="all, delete-orphan")
+    schedules = relationship("Schedule", back_populates="user", cascade="all, delete-orphan")
 
     # --- 블로그 플랫폼 쪽 --------------------------------------------------
     posts = relationship("Post", back_populates="user", cascade="all, delete-orphan")

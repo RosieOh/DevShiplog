@@ -5,6 +5,15 @@ export interface JobStatus {
   id: string
   status: 'queued' | 'running' | 'succeeded' | 'failed'
   progress: number
+  current_step?: string
+  steps?: {
+    ingest?: { status: string; progress: number }
+    outline?: { status: string; progress: number }
+    draft?: { status: string; progress: number }
+    style?: { status: string; progress: number }
+    safety?: { status: string; progress: number }
+    polish?: { status: string; progress: number }
+  }
   result_ref?: any
   error_text?: string
 }

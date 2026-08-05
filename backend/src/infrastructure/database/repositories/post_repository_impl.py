@@ -25,6 +25,8 @@ def _boolean_mode_query(term: str) -> str:
     각 토큰에 접두 와일드카드를 붙인다. 한국어는 '리액트를' 처럼 조사가 붙어 다녀서,
     정확히 일치하는 토큰만 찾으면 '리액트' 검색이 거의 안 걸린다.
     """
+    # 2글자 미만은 버린다. docker-compose 에서 innodb_ft_min_token_size=2 로 맞춰 뒀으므로
+    # 그보다 짧은 토큰은 애초에 색인에 없다 (보내 봐야 결과가 0이고 질의만 무거워진다).
     tokens = [t for t in term.translate(_FT_OPERATORS).split() if len(t) >= 2]
     return " ".join(f"+{t}*" for t in tokens[:8])  # 토큰이 너무 많으면 질의가 무거워진다
 

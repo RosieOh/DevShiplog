@@ -97,6 +97,29 @@ class DraftRepositoryImpl(DraftRepository):
         self.db.refresh(version)
         return version
 
+    # 갱신을 허용하는 컬럼을 못 박는다. **fields 를 그대로 setattr 하면
+    # user_id 같은 것까지 바꿀 수 있게 된다.
+    _EDITABLE = ("tags", "notes", "checklist")
+
+    def update_metadata(self, draft_id: str, **fields) -> Draft:
+        draft = self.get_by_id(draft_id)
+        if not draft:
+            raise ValueError(f"Draft {draft_id} not found")
+
+        for key, value in fields.items():
+            if key in self._EDITABLE:
+                setattr(draft, key, value)
+
+        self.db.commit()
+        self.db.refresh(draft)
+        return draft
+
+    def delete(self, draft_id: str) -> None:
+        draft = self.get_by_id(draft_id)
+        if draft:
+            self.db.delete(draft)
+            self.db.commit()
+
     def get_version_by_id(self, version_id: str) -> Optional[DraftVersion]:
         return self.db.query(DraftVersion).filter(DraftVersion.id == version_id).first()
 
