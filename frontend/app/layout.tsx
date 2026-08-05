@@ -7,6 +7,7 @@ import Footer from '@/components/layout/Footer'
 import Toast from '@/components/ui/Toast'
 import SessionProvider from '@/components/providers/SessionProvider'
 import { SITE_NAME, SITE_URL } from '@/lib/api/public'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 /*
  * 본문 서체는 OS 시스템 스택을 쓴다 (globals.css).
@@ -52,20 +53,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body>
-        <SessionProvider>
-          <a
-            href="#main"
-            className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded focus:bg-ink focus:px-4 focus:py-2 focus:text-bg"
-          >
-            본문으로 건너뛰기
-          </a>
-          <Header />
-          <main id="main" className="min-h-[60vh] pt-16">
-            {children}
-          </main>
-          <Footer />
-          <Toast />
-        </SessionProvider>
+        {/* 렌더 중 예외가 나도 흰 화면 대신 복구할 수 있는 화면을 보여준다. */}
+        <ErrorBoundary>
+          <SessionProvider>
+            <a
+              href="#main"
+              className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded focus:bg-ink focus:px-4 focus:py-2 focus:text-bg"
+            >
+              본문으로 건너뛰기
+            </a>
+            <Header />
+            <main id="main" className="min-h-[60vh] pt-16">
+              {children}
+            </main>
+            <Footer />
+            <Toast />
+          </SessionProvider>
+        </ErrorBoundary>
       </body>
     </html>
   )

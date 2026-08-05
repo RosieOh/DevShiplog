@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from src.ports.input.api.v1 import (
+    analytics,
     auth,
     drafts,
     export,
@@ -9,10 +10,12 @@ from src.ports.input.api.v1 import (
     profile,
     public,
     safety,
+    schedules,
     series,
     social,
     sources,
     style_profiles,
+    templates,
     uploads,
     usage,
 )
@@ -41,3 +44,8 @@ api_router.include_router(uploads.router, prefix="/uploads", tags=["uploads"])
 api_router.include_router(posts.router, prefix="/posts", tags=["posts"])
 api_router.include_router(social.router, prefix="/social", tags=["social"])
 api_router.include_router(series.router, prefix="/series", tags=["series"])
+
+# --- 작성 보조 -------------------------------------------------------------
+api_router.include_router(templates.router, prefix="/templates", tags=["templates"])
+api_router.include_router(schedules.router, prefix="/schedules", tags=["schedules"])
+api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])

@@ -24,3 +24,6 @@ class StyleProfile(Base):
     # Relationships
     user = relationship("User", back_populates="style_profiles")
     drafts = relationship("Draft", back_populates="style_profile")
+    # 이 문체를 기본값으로 쓰는 템플릿들.
+    # 문체를 지워도 템플릿은 남는다(문체 없이도 쓸 수 있다) — cascade 를 걸지 않는다.
+    templates = relationship("Template", back_populates="style_profile")

@@ -49,6 +49,8 @@ class JobRepositoryImpl(JobRepository):
         job_id: str,
         status: Optional[JobStatus] = None,
         progress: Optional[int] = None,
+        current_step: Optional[str] = None,
+        steps: Optional[dict] = None,
         result_ref: Optional[dict] = None,
         error_text: Optional[str] = None,
     ) -> Job:
@@ -60,6 +62,10 @@ class JobRepositoryImpl(JobRepository):
             job.status = status
         if progress is not None:
             job.progress = progress
+        if current_step is not None:
+            job.current_step = current_step
+        if steps is not None:
+            job.steps = steps
         if result_ref is not None:
             # JSON 컬럼은 in-place 변경을 감지하지 못하므로 항상 새 dict 를 할당한다.
             job.result_ref = {**(job.result_ref or {}), **result_ref}

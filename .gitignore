@@ -63,3 +63,9 @@ tsconfig.tsbuildinfo
 
 # 업로드된 사용자 파일 (운영에서는 S3)
 backend/uploads/
+
+# E2E 브라우저 검증 산출물
+e2e/browser/node_modules/
+e2e/browser/shots/
+e2e/browser/*.json
+!e2e/browser/package.json

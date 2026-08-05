@@ -3,6 +3,8 @@ fastapi==0.115.6
 uvicorn[standard]==0.32.1
 pydantic==2.10.3
 pydantic-settings==2.6.1
+# EmailStr 은 이 패키지가 있어야 동작한다. pydantic 이 자동으로 끌어오지 않는다.
+email-validator>=2.1.1
 
 # Database
 sqlalchemy==2.0.36
@@ -44,3 +46,4 @@ email-validator==2.2.0
 pytest==8.3.4
 pytest-asyncio==0.25.0
 Pillow==11.0.0
+moto[s3]==5.2.2
