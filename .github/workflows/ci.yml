@@ -182,15 +182,6 @@ jobs:
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s --health-timeout 5s --health-retries 5
-      minio:
-        image: bitnami/minio:2024
-        env:
-          MINIO_ROOT_USER: devshiplog
-          MINIO_ROOT_PASSWORD: devshiplog1234
-        ports: ['9000:9000']
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live"
-          --health-interval 10s --health-timeout 5s --health-retries 10
       mailpit:
         image: axllent/mailpit:v1.21
         env:
@@ -234,7 +225,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: MariaDB 기동
+      - name: MariaDB · MinIO 기동
         # 전문검색 최소 토큰 길이를 2로 내려야 "자바" 같은 2글자 한국어가 색인된다.
         # 기본값 3에서는 검색해도 결과가 0이다.
         run: |
