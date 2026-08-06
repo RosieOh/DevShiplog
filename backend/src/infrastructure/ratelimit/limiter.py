@@ -37,6 +37,8 @@ RULES = {
     "login": Rule(limit=20, window_seconds=300),
     # 재설정 메일은 남의 주소로도 요청할 수 있다. 메일 폭탄으로 쓰이지 않게 좁게 잡는다.
     "password_reset": Rule(limit=5, window_seconds=3600),
+    # "해봤다" 신호는 좋아요보다 무겁다. 남발되면 신호가 아니라 잡음이 된다.
+    "signal": Rule(limit=30, window_seconds=3600),
 }
 
 
