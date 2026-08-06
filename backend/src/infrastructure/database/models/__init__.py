@@ -24,6 +24,7 @@ from src.infrastructure.database.models.social import Comment, Follow, Notificat
 from src.infrastructure.database.models.moderation import Report, UserBlock
 from src.infrastructure.database.models.post_view import PostView
 from src.infrastructure.database.models.password_reset import PasswordResetToken
+from src.infrastructure.database.models.tech import PostSignal, PostStack
 
 __all__ = [
     "User",
@@ -49,4 +50,6 @@ __all__ = [
     "UserBlock",
     "PostView",
     "PasswordResetToken",
+    "PostStack",
+    "PostSignal",
 ]
