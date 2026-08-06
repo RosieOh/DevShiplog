@@ -132,6 +132,102 @@ jobs:
           fi
           echo "어긋남 없음"
 
+  backup:
+    name: 백업 · 왕복 복원 (MariaDB)
+    runs-on: ubuntu-latest
+    # 복원해 본 적 없는 백업은 백업이 아니라 희망이다.
+    # 백업 스크립트는 쓸 일이 없다가 정작 사고 났을 때 처음 돌리게 되는데,
+    # 그때 망가져 있는 것을 발견하면 이미 늦었다. 매 커밋마다 실제로 왕복시킨다.
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: rootpassword
+          MARIADB_DATABASE: devshiplog
+          MARIADB_USER: devshiplog
+          MARIADB_PASSWORD: devshiplog
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: mysql+pymysql://devshiplog:devshiplog@127.0.0.1:3306/devshiplog
+      ENVIRONMENT: test
+      SECRET_KEY: test-secret-key-for-ci-only-not-production
+      OPENAI_API_KEY: sk-test-not-a-real-key
+      # 오브젝트 저장소는 이 잡의 관심사가 아니다. DB 왕복만 본다.
+      STORAGE_BACKEND: local
+      BACKUP_ADMIN_USER: root
+      BACKUP_ADMIN_PASSWORD: rootpassword
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: 의존성 설치
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: MariaDB 클라이언트 설치
+        run: sudo apt-get update && sudo apt-get install -y mariadb-client
+
+      - name: 스키마 + 데이터 준비
+        working-directory: backend
+        # 빈 DB 를 백업하면 무엇이든 통과한다. 실제로 행이 있어야 검증이 의미가 있다.
+        run: |
+          alembic upgrade head
+          python - <<'PY'
+          import uuid
+          from src.infrastructure.database.session import SessionLocal
+          from src.infrastructure.database.models.user import User
+
+          db = SessionLocal()
+          for i in range(5):
+              db.add(User(
+                  id=str(uuid.uuid4()),
+                  email=f"backup-{i}@example.com",
+                  password_hash="x" * 60,
+                  name=f"백업 테스트 {i}",
+              ))
+          db.commit()
+          print("사용자", db.query(User).count(), "명")
+          db.close()
+          PY
+
+      - name: 백업
+        working-directory: backend
+        run: python -m scripts.backup --out ./backups --skip-objects
+
+      - name: 왕복 복원 검증
+        working-directory: backend
+        # 임시 DB 에 실제로 복원하고 표 별 행 수를 맞춰 본다.
+        run: python -m scripts.verify_backup --latest --root ./backups
+
+      - name: 손상된 백업은 거부하는지
+        working-directory: backend
+        # 검증이 항상 통과하면 검증이 아니다. 일부러 잘라서 실패를 확인한다.
+        run: |
+          latest=$(ls -d ./backups/*/ | tail -1)
+          cp -r "$latest" ./backups/corrupt
+          python -c "
+          p = './backups/corrupt/database.sql.gz'
+          data = open(p, 'rb').read()
+          open(p, 'wb').write(data[:len(data)//2])
+          "
+          if python -m scripts.verify_backup ./backups/corrupt; then
+            echo "::error::손상된 백업이 검증을 통과했습니다 — 검증이 아무것도 안 하고 있습니다"
+            exit 1
+          fi
+          echo "손상된 백업을 정상적으로 거부했습니다"
+
   frontend:
     name: 프론트엔드 · 타입·린트·빌드
     runs-on: ubuntu-latest
