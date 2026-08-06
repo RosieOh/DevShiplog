@@ -16,6 +16,8 @@ const LABEL: Record<NotificationItem['type'], string> = {
   reply: '님이 답글을 남겼습니다',
   like: '님이 좋아요를 눌렀습니다',
   follow: '님이 팔로우했습니다',
+  // 다른 알림과 무게가 다르다. 이건 "당신 글이 지금 안 됩니다" 라는 뜻이다.
+  signal_broken: '님이 이 글대로 했는데 안 된다고 알렸습니다',
 }
 
 export default function NotificationsPage() {

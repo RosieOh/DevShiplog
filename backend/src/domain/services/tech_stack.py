@@ -93,6 +93,26 @@ _PY_DEP = re.compile(r"^([A-Za-z][\w.-]*)\s*[=~>]=\s*(\d+(?:\.\d+){0,2})", re.MU
 _JS_IMPORT = re.compile(r"""(?:from|require\()\s*['"]([@\w/.-]+)['"]""")
 _PY_IMPORT = re.compile(r"^\s*(?:from|import)\s+([a-zA-Z_][\w]*)", re.MULTILINE)
 
+# 컨테이너 이미지 태그:  image: postgres:17-alpine  /  FROM python:3.12-slim
+# 인프라 글에서 버전을 알 수 있는 거의 유일한 자리다.
+_IMAGE_TAG = re.compile(
+    r"(?:^\s*image:\s*|FROM\s+)[\w./-]*?([a-zA-Z][\w-]*):(\d+(?:\.\d+){0,2})",
+    re.MULTILINE,
+)
+
+# go.mod 의 `go 1.23` 한 줄. go 글이면 거의 항상 있다.
+_GO_MOD = re.compile(r"^\s*go\s+(\d+\.\d+(?:\.\d+)?)\s*$", re.MULTILINE)
+
+# lock 파일·YAML 의 `vite: 6.0.3` 형태.
+# 아는 이름일 때만 받는다. 아무 key:value 나 받으면 설정값이 버전으로 둔갑한다.
+_YAML_VERSION = re.compile(
+    r"^\s*[\"']?([a-zA-Z][\w.@/-]*)[\"']?:\s*[\"']?[\^~>=<v]*(\d+(?:\.\d+){0,2})[\"']?\s*$",
+    re.MULTILINE,
+)
+
+# 쿠버네티스 매니페스트. 버전은 못 주지만 "쿠버네티스 글" 이라는 건 확실하다.
+_K8S = re.compile(r"^\s*apiVersion:\s*\S+", re.MULTILINE)
+
 MAX_STACKS = 12
 
 
@@ -182,20 +202,40 @@ def detect(markdown: str) -> List[DetectedStack]:
             if name:
                 _add(found, DetectedStack(name, _short_version(version), "high", "requirements"))
 
-        # 3) import — 버전은 없지만 쓰인 건 확실하다
+        # 3) 컨테이너 이미지 태그 — 인프라 글에서 버전을 알 수 있는 거의 유일한 자리
+        for raw, version in _IMAGE_TAG.findall(content):
+            name = normalize(raw)
+            if name:
+                _add(found, DetectedStack(name, _short_version(version), "high", "이미지 태그"))
+
+        # 4) go.mod
+        for version in _GO_MOD.findall(content):
+            _add(found, DetectedStack("go", _short_version(version), "high", "go.mod"))
+
+        # 5) lock 파일·YAML 의 `이름: 버전`
+        for raw, version in _YAML_VERSION.findall(content):
+            name = normalize(raw)
+            if name:
+                _add(found, DetectedStack(name, _short_version(version), "medium", "잠금 파일"))
+
+        # 6) 쿠버네티스 매니페스트
+        if _K8S.search(content):
+            _add(found, DetectedStack("kubernetes", None, "medium", "쿠버네티스 매니페스트"))
+
+        # 7) import — 버전은 없지만 쓰인 건 확실하다
         for raw in _JS_IMPORT.findall(content) + _PY_IMPORT.findall(content):
             name = normalize(raw)
             if name:
                 _add(found, DetectedStack(name, None, "medium", "import 문"))
 
-    # 4) 산문의 "React 18" 같은 표현
+    # 8) 산문의 "React 18" 같은 표현
     prose = _prose(markdown)
     for raw, version in _NAMED_VERSION.findall(prose):
         name = normalize(raw)
         if name:
             _add(found, DetectedStack(name, _short_version(version), "medium", f"본문의 “{raw} {version}”"))
 
-    # 5) 버전 없이 이름만 언급된 것
+    # 9) 버전 없이 이름만 언급된 것
     for raw in re.findall(r"\b([A-Za-z][\w.#+-]{1,20})\b", prose):
         name = normalize(raw)
         if name and name not in found:
