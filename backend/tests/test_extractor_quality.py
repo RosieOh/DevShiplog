@@ -13,11 +13,16 @@ import pytest
 from src.domain.services.tech_stack import detect
 from tests.fixtures.posts_corpus import CORPUS
 
-# 하한. 코퍼스를 늘리면 자연히 떨어질 수 있으므로, 떨어뜨릴 때는
-# "왜 이 형태는 못 잡아도 되는가" 를 커밋 메시지에 남긴다.
-MIN_NAME_RECALL = 0.90
-MIN_VERSION_RECALL = 0.85
-MAX_FALSE_POSITIVE_RATE = 0.15
+# 하한.
+#
+# 지금 코퍼스에서는 100% 지만 하한을 100% 로 잡지 않는다.
+# 그러면 어려운 표본을 하나 추가하는 순간 빨간불이 되고, 사람들은 표본을
+# 추가하지 않게 된다. 코퍼스가 커지는 것이 하한을 지키는 것보다 중요하다.
+#
+# 떨어뜨릴 때는 "왜 이 형태는 못 잡아도 되는가" 를 커밋 메시지에 남긴다.
+MIN_NAME_RECALL = 0.95
+MIN_VERSION_RECALL = 0.90
+MAX_FALSE_POSITIVE_RATE = 0.05
 
 
 def measure():

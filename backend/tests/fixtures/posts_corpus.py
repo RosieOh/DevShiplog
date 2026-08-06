@@ -240,3 +240,218 @@ retries = 3
 """,
     },
 ]
+
+# ─────────────────────────────────────────────────────────────────────────
+# 아래는 **처음 코퍼스를 만들 때 생각하지 못한** 형태들이다.
+#
+# 첫 12건은 내가 예상한 모양만 담고 있었고, 거기서 100% 가 나온 것은
+# "예상한 것은 잡는다" 는 뜻일 뿐이었다. 예상 밖을 넣어야 진짜 수치가 나온다.
+# ─────────────────────────────────────────────────────────────────────────
+
+CORPUS += [
+    # --- 다른 생태계 ------------------------------------------------------
+    {
+        "name": "Java · Gradle",
+        "expect": {"java": "21", "spring-boot": "3.4", "kotlin": None},
+        "body": """멀티모듈로 쪼갠 기록입니다.
+
+```groovy
+plugins {
+    id 'org.springframework.boot' version '3.4.1'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+}
+```
+
+Kotlin DSL 로 옮길지 고민 중입니다.
+""",
+    },
+    {
+        "name": "Java · Maven pom.xml",
+        "expect": {"java": "17", "spring-boot": "3.2"},
+        "body": """의존성 정리 기록입니다.
+
+```xml
+<parent>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-parent</artifactId>
+  <version>3.2.5</version>
+</parent>
+<properties>
+  <java.version>17</java.version>
+</properties>
+```
+""",
+    },
+    {
+        "name": "Rust · Cargo.toml",
+        "expect": {"rust": "1.83", "tokio": "1.42"},
+        "body": """비동기 런타임을 붙였습니다.
+
+```toml
+[package]
+edition = "2021"
+rust-version = "1.83"
+
+[dependencies]
+tokio = { version = "1.42", features = ["full"] }
+```
+""",
+    },
+    {
+        "name": "Ruby · Gemfile",
+        "expect": {"ruby": "3.3", "rails": "7.2", "puma": None},
+        "body": """레일즈 업그레이드 기록입니다.
+
+```ruby
+ruby '3.3.6'
+gem 'rails', '~> 7.2.2'
+gem 'puma'
+```
+""",
+    },
+    {
+        "name": ".NET · csproj",
+        "expect": {"csharp": None, "dotnet": "8.0"},
+        "body": """최소 API 로 다시 썼습니다.
+
+```xml
+<PropertyGroup>
+  <TargetFramework>net8.0</TargetFramework>
+</PropertyGroup>
+<ItemGroup>
+  <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
+</ItemGroup>
+```
+""",
+    },
+    {
+        "name": "PHP · composer.json",
+        "expect": {"php": "8.3", "laravel": "11.0"},
+        "body": """라라벨 버전을 올렸습니다.
+
+```json
+{
+  "require": {
+    "php": "^8.3",
+    "laravel/framework": "^11.0"
+  }
+}
+```
+""",
+    },
+
+    # --- 한국어 버전 표기 --------------------------------------------------
+    {
+        "name": "한국어 표기 · “18버전”, “v14”",
+        "expect": {"react": "18", "nextjs": "14"},
+        "body": """React 18버전에서 Next v14 로 올린 기록입니다.
+
+동시성 기능이 들어오면서 렌더링 타이밍이 바뀌었습니다.
+""",
+    },
+    {
+        "name": "한국어 표기 · 마이그레이션 (before → after)",
+        "expect": {"nextjs": "15", "react": "19"},
+        "body": """Next 14 에서 15 로 올렸습니다. React 도 18 에서 19 가 됐습니다.
+
+가장 크게 바뀐 것은 캐싱 기본값입니다.
+
+> 글의 전제는 **올린 뒤** 버전입니다. 이전 버전이 아닙니다.
+""",
+    },
+    {
+        "name": "한국어 표기 · 조사가 붙음",
+        "expect": {"python": "3.12", "django": None},
+        "body": """Python 3.12를 쓰면서 Django의 비동기 뷰를 정리합니다.
+
+타입 힌트가 편해졌습니다.
+""",
+    },
+
+    # --- 함정: 버전처럼 보이지만 아닌 숫자 ----------------------------------
+    {
+        "name": "함정 · 날짜·시간·비율",
+        "expect": {"python": None},
+        "body": """2024.01.15 에 시작해서 3.5초 걸리던 작업을 0.8초로 줄였습니다.
+가용성은 99.9% 를 유지했습니다.
+
+```python
+import statistics
+```
+
+RFC 7231 을 참고했습니다.
+""",
+    },
+    {
+        "name": "함정 · 포트 번호와 IP",
+        "expect": {"nginx": None, "docker": None},
+        "body": """nginx 를 앞에 두고 localhost:3000 으로 프록시했습니다.
+내부망은 10.0.1.24 입니다.
+
+```dockerfile
+EXPOSE 8080
+```
+""",
+    },
+    {
+        "name": "함정 · 표 안의 숫자",
+        "expect": {"redis": None},
+        "body": """벤치마크 결과입니다.
+
+| 동시성 | p50 | p99 |
+|---|---|---|
+| 100 | 12 | 45 |
+| 500 | 31 | 180 |
+
+redis 캐시를 앞에 두니 확실히 나아졌습니다.
+""",
+    },
+
+    # --- 혼합 -------------------------------------------------------------
+    {
+        "name": "풀스택 · 여러 서비스",
+        "expect": {
+            "nextjs": "15.1", "react": "19.0", "fastapi": "0.115",
+            "postgresql": "17", "redis": "7.4", "docker": None, "python": None,
+        },
+        "body": """모노레포 구성을 정리합니다.
+
+```json
+{ "dependencies": { "next": "15.1.0", "react": "19.0.0" } }
+```
+
+```
+fastapi==0.115.6
+```
+
+```yaml
+services:
+  db:
+    image: postgres:17-alpine
+  cache:
+    image: redis:7.4
+```
+
+```dockerfile
+FROM python:3.12-slim
+```
+""",
+    },
+    {
+        "name": "짧은 글 · 스니펫만",
+        "expect": {"typescript": None},
+        "body": """자주 까먹어서 적어둡니다.
+
+```ts
+const unique = <T,>(xs: T[]) => [...new Set(xs)]
+```
+""",
+    },
+]

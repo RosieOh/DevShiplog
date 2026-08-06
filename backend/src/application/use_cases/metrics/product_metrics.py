@@ -16,6 +16,12 @@ from src.infrastructure.database.models.product_event import ProductEvent
 
 logger = logging.getLogger(__name__)
 
+# 이 수 아래에서는 결론내지 않는다.
+#
+# 5건으로 "루프가 안 돈다" 고 접으면 그건 측정이 아니라 성급함이다.
+# 20건은 통계적 근거라기보다, 사람이 "해봤다" 고 말할 수 있는 최소선이다.
+MIN_SAMPLE = 20
+
 # 이벤트 이름
 STACK_SUGGESTED = "stack_suggested"   # 발행 시 자동 추출 결과
 STACK_CONFIRMED = "stack_confirmed"   # 작성자가 최종 확정한 결과
@@ -197,8 +203,14 @@ def summary(db: Session) -> Dict[str, Any]:
     response = signal_response(db)
 
     verdicts = []
-    if correction["publishes"] < 20:
-        verdicts.append("표본이 부족합니다. 발행 20건은 넘어야 판단할 수 있습니다.")
+    if correction["publishes"] < MIN_SAMPLE:
+        # "표본이 부족합니다" 만 띄우면 얼마나 남았는지 알 수 없고,
+        # 그러면 이 화면을 다시 볼 이유가 없다. 진척을 보여준다.
+        remaining = MIN_SAMPLE - correction["publishes"]
+        verdicts.append(
+            f"판단하기에 이릅니다. 발행 {correction['publishes']}/{MIN_SAMPLE}건 — "
+            f"{remaining}건 더 필요합니다."
+        )
     else:
         if correction["published_empty"] / correction["publishes"] > 0.5:
             verdicts.append(
@@ -215,5 +227,11 @@ def summary(db: Session) -> Dict[str, Any]:
         "stack_correction": correction,
         "reverification": reverification,
         "signal_response": response,
+        # 표본이 얼마나 모였는지. 화면이 진행 막대를 그리는 데 쓴다.
+        "sample": {
+            "publishes": correction["publishes"],
+            "required": MIN_SAMPLE,
+            "ready": correction["publishes"] >= MIN_SAMPLE,
+        },
         "verdicts": verdicts or ["세 지표 모두 기준선을 넘습니다."],
     }
