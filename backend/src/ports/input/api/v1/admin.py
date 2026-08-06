@@ -12,6 +12,8 @@ from pydantic import BaseModel, Field
 
 from src.application.errors import NotFoundError, ValidationError
 from src.domain.enums import PostStatus, ReportStatus
+from src.infrastructure.observability.errors import error_tracker
+from src.infrastructure.observability.health import readiness
 from src.ports.input.api.v1.dependencies import (
     get_admin_user_id,
     get_post_repo,
@@ -134,8 +136,43 @@ def admin_summary(
 ):
     """운영자가 첫 화면에서 볼 것.
 
-    지금은 "밀린 신고가 몇 건인가" 하나뿐이다. 대시보드를 크게 만드는 것보다
-    처리해야 할 일이 눈에 띄는 게 먼저다.
+    처리할 신고와 최근 오류. 대시보드를 크게 만드는 것보다
+    "지금 손댈 일이 있는가" 가 한눈에 보이는 게 먼저다.
     """
     pending = report_repo.list_open(limit=100, offset=0)
-    return {"pending_reports": len(pending)}
+    return {
+        "pending_reports": len(pending),
+        "error_groups": len(error_tracker.recent(limit=100)),
+        "error_events": error_tracker.total(),
+    }
+
+
+@router.get("/errors")
+def recent_errors(
+    limit: int = Query(20, ge=1, le=50),
+    _: str = Depends(get_admin_user_id),
+):
+    """최근 서버 오류.
+
+    한계를 함께 실어 보낸다 — 이 목록은 이 프로세스의 메모리에만 있다.
+    재시작하면 사라지고, 워커가 여럿이면 응답이 닿은 워커의 것만 보인다.
+    모르고 믿는 게 없는 것보다 나쁘다.
+    """
+    return {
+        "items": error_tracker.recent(limit=limit),
+        "total_events": error_tracker.total(),
+        "note": (
+            "이 프로세스의 메모리에만 남습니다. 재시작하면 사라지고, "
+            "워커가 여럿이면 일부만 보입니다. 영구 보관은 SENTRY_DSN 을 설정하세요."
+        ),
+    }
+
+
+@router.get("/readiness")
+def admin_readiness(_: str = Depends(get_admin_user_id)):
+    """의존성 상태.
+
+    /health/ready 와 같은 점검이지만, 운영자 화면에서 보려고 여기에도 둔다.
+    공개 엔드포인트는 로드밸런서가 쓰고, 이건 사람이 본다.
+    """
+    return readiness()
