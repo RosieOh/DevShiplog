@@ -620,7 +620,7 @@ export default function DraftEditPage() {
           </div>
         )}
 
-        {activeTab === 'publish' && <PublishPanel draftId={draftId} />}
+        {activeTab === 'publish' && <PublishPanel draftId={draftId} contentMd={content} />}
 
         {activeTab === 'export' && (
           <div className="bg-surface rounded-lg border border-border-subtle p-8">
