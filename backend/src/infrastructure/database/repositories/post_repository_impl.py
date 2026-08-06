@@ -232,9 +232,21 @@ class PostRepositoryImpl(PostRepository):
             q = q.filter(~Post.user_id.in_(list(exclude_user_ids)))
 
         if sort == "trending":
-            # 최근성과 반응을 함께 본다. 좋아요만 보면 오래된 글이 상단을 점유한다.
+            # 최근성과 반응, 그리고 **검증 여부**를 함께 본다.
+            #
+            # 검증에 보상이 없으면 아무도 안 누른다. 누르면 실제로 더 읽히게 만들어야
+            # 갱신 루프가 돈다. 다만 검증만으로 반응을 이기지는 못하게 한다 —
+            # 그러면 아무도 안 읽는 글을 계속 검증하는 쪽이 유리해진다.
+            verified_bonus = case(
+                (
+                    Post.verified_at
+                    >= datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=180),
+                    8,
+                ),
+                else_=0,
+            )
             q = q.order_by(
-                (Post.like_count * 3 + Post.comment_count * 2).desc(),
+                (Post.like_count * 3 + Post.comment_count * 2 + verified_bonus).desc(),
                 Post.published_at.desc(),
             )
         else:
