@@ -10,6 +10,7 @@ from src.domain.enums import PostStatus
 from src.infrastructure.database.models.post import Post
 from src.infrastructure.database.models.post_view import PostView
 from src.infrastructure.database.models.tag import PostTag, Tag
+from src.infrastructure.database.models.tech import PostStack
 from src.infrastructure.database.models.social import Follow, PostLike
 from src.infrastructure.database.models.user import User
 from src.ports.output.repositories.post_repository import PostRepository
@@ -338,6 +339,43 @@ class PostRepositoryImpl(PostRepository):
             .offset(offset)
             .all()
         )
+
+    def list_by_stack(
+        self,
+        name: str,
+        version: Optional[str] = None,
+        sort: str = "fresh_first",
+        limit: int = 20,
+        offset: int = 0,
+    ) -> List[Post]:
+        query = (
+            self.db.query(Post)
+            .options(*_LIST_LOADS)
+            .join(PostStack, PostStack.post_id == Post.id)
+            .filter(Post.status == PostStatus.PUBLISHED, PostStack.name == name)
+        )
+        if version:
+            # 18 을 주면 18.x 를 모두 잡는다. 18.3 만 보고 싶으면 그대로 적으면 된다.
+            query = query.filter(
+                or_(PostStack.version == version, PostStack.version.like(f"{version}.%"))
+            )
+
+        if sort == "recent":
+            query = query.order_by(Post.published_at.desc())
+        elif sort == "trending":
+            query = query.order_by(
+                (Post.like_count * 3 + Post.comment_count * 2).desc(), Post.published_at.desc()
+            )
+        else:
+            # 기본값이 이것인 게 이 제품의 입장이다.
+            # 최신순으로 두면 "최근에 쓴 낡은 글" 이 위로 온다. 독자가 원하는 건
+            # 최근에 쓴 글이 아니라 지금도 되는 글이다.
+            query = query.order_by(
+                func.coalesce(Post.verified_at, Post.published_at).desc(),
+                Post.like_count.desc(),
+            )
+
+        return query.limit(limit).offset(offset).all()
 
     def search(self, query: str, limit: int, offset: int) -> List[Post]:
         """제목·요약·본문 전문검색.
