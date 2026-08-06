@@ -159,7 +159,15 @@ def test_잘_됐어요_는_알리지_않는다(client):
 def test_표본이_적으면_판단을_보류한다(client, db_session):
     """20건도 안 되는데 "루프가 안 돈다" 고 결론내면 안 된다."""
     summary = metrics.summary(db_session)
-    assert any("표본" in v for v in summary["verdicts"])
+    assert any("판단하기에 이릅니다" in v for v in summary["verdicts"])
+
+
+def test_표본_진척을_알려준다(client, db_session):
+    """"부족합니다" 만 띄우면 얼마나 남았는지 알 수 없고, 다시 볼 이유가 없다."""
+    summary = metrics.summary(db_session)
+    assert summary["sample"]["required"] == metrics.MIN_SAMPLE
+    assert summary["sample"]["ready"] is False
+    assert f"/{metrics.MIN_SAMPLE}건" in summary["verdicts"][0]
 
 
 def test_지표가_비어_있어도_500_이_아니다(client):
