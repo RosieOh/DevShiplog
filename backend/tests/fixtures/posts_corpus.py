@@ -511,3 +511,99 @@ services:
 """,
     },
 ]
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# 웹 백엔드/프론트엔드 편향을 메우는 표본.
+#
+# 앞의 표본은 전부 웹이었다. Spring·Django 를 검색해서 골랐기 때문이다.
+# 모바일·데이터·게임 글을 돌려보니 **아무것도 안 잡혔다** — 사전이 그쪽을
+# 통째로 모르고 있었다. 분야 편향은 이렇게 조용히 생긴다.
+# ─────────────────────────────────────────────────────────────────────────
+
+CORPUS += [
+    {
+        "name": "모바일 · Flutter",
+        "expect": {"dart": "3.5", "flutter": None},
+        "body": """플러터 프로젝트 구조를 정리합니다.
+
+```dart
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+```
+
+```yaml
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+```
+""",
+    },
+    {
+        # Podfile 은 Ruby 문법이라 ```ruby 로 적는 사람이 많다.
+        # 그대로 두면 iOS 글이 "Ruby 글" 이 된다.
+        "name": "모바일 · iOS (Podfile 은 Ruby 문법)",
+        "expect": {"swiftui": None, "swift": None, "xcode": "12.4",
+                   "ios": "14.0", "alamofire": "5.8"},
+        "body": """SwiftUI 를 쓰려면 Xcode 11 이상이 필요합니다. 저는 Xcode 12.4 를 씁니다.
+
+```swift
+import SwiftUI
+
+struct ContentView: View {
+    var body: some View { Text("Hi") }
+}
+```
+
+```ruby
+platform :ios, "14.0"
+pod "Alamofire", "~> 5.8"
+```
+""",
+    },
+    {
+        "name": "모바일 · Android Compose",
+        "expect": {"kotlin": "2.0", "android": "35", "jetpack-compose": "1.7"},
+        "body": """안드로이드 컴포즈로 화면을 다시 짰습니다. Kotlin 2.0 을 씁니다.
+
+```kotlin
+@Composable
+fun Greeting(name: String) { Text("Hello $name") }
+```
+
+```groovy
+android {
+    compileSdk 35
+}
+dependencies {
+    implementation "androidx.compose.ui:ui:1.7.5"
+}
+```
+""",
+    },
+    {
+        "name": "데이터 엔지니어링",
+        "expect": {"airflow": "2.10", "spark": "3.5", "python": None},
+        "body": """Airflow 2.10 으로 파이프라인을 옮겼습니다. Spark 3.5 를 씁니다.
+
+```python
+from airflow import DAG
+from pyspark.sql import SparkSession
+```
+""",
+    },
+    {
+        "name": "게임 · Unity",
+        "expect": {"unity": "2022.3", "csharp": None},
+        "body": """Unity 2022.3 LTS 에서 만든 프로젝트입니다.
+
+```csharp
+using UnityEngine;
+
+public class Player : MonoBehaviour { }
+```
+""",
+    },
+]

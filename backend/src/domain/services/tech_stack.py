@@ -35,6 +35,7 @@ ALIASES: Dict[str, str] = {
     "rs": "rust", "rust": "rust",
     "java": "java", "kotlin": "kotlin", "kt": "kotlin",
     "swift": "swift", "rb": "ruby", "ruby": "ruby",
+    "ios": "ios", "ipados": "ios", "macos": "macos", "watchos": "watchos",
     "php": "php", "cs": "csharp", "csharp": "csharp", "c#": "csharp",
     # 프론트엔드
     "react": "react", "리액트": "react", "react.js": "react", "reactjs": "react",
@@ -88,6 +89,33 @@ ALIASES: Dict[str, str] = {
     "도커": "docker", "쿠버네티스": "kubernetes", "쿠베": "kubernetes",
     "레디스": "redis", "몽고": "mongodb", "포스트그레스": "postgresql",
     "고랭": "go", "러스트": "rust", "루비": "ruby",
+
+    # --- 모바일 ---------------------------------------------------------
+    # 여기가 통째로 비어 있었다. Flutter 글에서 아무것도 못 찾았다.
+    "flutter": "flutter", "플러터": "flutter", "dart": "dart", "다트": "dart",
+    "swiftui": "swiftui", "uikit": "uikit", "xcode": "xcode",
+    "cocoapods": "cocoapods", "spm": "swift-package-manager",
+    "alamofire": "alamofire", "combine": "combine",
+    "android": "android", "안드로이드": "android",
+    "compose": "jetpack-compose", "jetpack compose": "jetpack-compose",
+    "androidx.compose.ui": "jetpack-compose", "androidx.compose": "jetpack-compose",
+    "compilesdk": "android", "targetsdk": "android",
+    "retrofit": "retrofit", "coroutines": "kotlin-coroutines",
+    "react-native": "react-native", "expo": "expo",
+
+    # --- 데이터 ---------------------------------------------------------
+    "airflow": "airflow", "에어플로우": "airflow", "spark": "spark",
+    "pyspark": "spark", "스파크": "spark", "flink": "flink",
+    "pandas": "pandas", "numpy": "numpy", "polars": "polars",
+    "dbt": "dbt", "snowflake": "snowflake", "bigquery": "bigquery",
+    "airbyte": "airbyte", "dagster": "dagster",
+    "pytorch": "pytorch", "torch": "pytorch", "tensorflow": "tensorflow",
+    "sklearn": "scikit-learn", "scikit-learn": "scikit-learn",
+    "langchain": "langchain", "huggingface": "huggingface",
+
+    # --- 게임 -----------------------------------------------------------
+    "unity": "unity", "유니티": "unity", "unreal": "unreal", "언리얼": "unreal",
+    "godot": "godot", "unityengine": "unity",
 }
 
 # 코드 펜스 언어 → 스택. 언어는 확실한 신호다.
@@ -100,6 +128,11 @@ FENCE_LANGUAGES: Dict[str, str] = {
     "ruby": "ruby", "rb": "ruby", "php": "php",
     "sql": "sql", "bash": "shell", "sh": "shell", "shell": "shell",
     "dockerfile": "docker", "yaml": "", "yml": "", "json": "", "html": "", "css": "",
+    # 모바일·게임·데이터. 이것들이 빠져 있어서 해당 분야 글이 통째로 비었다.
+    "dart": "dart", "csharp": "csharp", "cs": "csharp", "objc": "objective-c",
+    "objectivec": "objective-c", "scala": "scala", "r": "r", "groovy": "",
+    "toml": "", "hcl": "terraform", "tf": "terraform", "proto": "protobuf",
+    "graphql": "graphql", "gql": "graphql",
 }
 
 _FENCE = re.compile(r"^\s*```([\w+#.-]*)", re.MULTILINE)
@@ -177,6 +210,8 @@ _PY_DEP = re.compile(r"^([A-Za-z][\w.-]*)\s*[=~>]=\s*(\d+(?:\.\d+){0,2})", re.MU
 # import 문 — 버전은 모르지만 "쓰였다" 는 확실하다
 _JS_IMPORT = re.compile(r"""(?:from|require\()\s*['"]([@\w/.-]+)['"]""")
 _PY_IMPORT = re.compile(r"^\s*(?:from|import)\s+([a-zA-Z_][\w]*)", re.MULTILINE)
+# Dart:  import 'package:flutter/material.dart';
+_DART_IMPORT = re.compile(r"""import\s+['"]package:(\w+)/""")
 
 # 컨테이너 이미지 태그:  image: postgres:17-alpine  /  FROM python:3.12-slim
 # 인프라 글에서 버전을 알 수 있는 거의 유일한 자리다.
@@ -187,6 +222,17 @@ _IMAGE_TAG = re.compile(
 
 # go.mod 의 `go 1.23` 한 줄. go 글이면 거의 항상 있다.
 _GO_MOD = re.compile(r"^\s*go\s+(\d+\.\d+(?:\.\d+)?)\s*$", re.MULTILINE)
+
+# Podfile:  platform :ios, "14.0"  /  pod "Alamofire", "~> 5.8"
+_PODFILE_PLATFORM = re.compile(r"""platform\s*:(\w+)\s*,\s*['"]([\d.]+)['"]""")
+_PODFILE_POD = re.compile(r"""^\s*pod\s+['"]([\w/+-]+)['"](?:\s*,\s*['"][~><=^\s]*([\d.]+)['"])?""",
+                          re.MULTILINE)
+
+# pubspec.yaml:  sdk: ">=3.5.0 <4.0.0"  /  http: ^1.2.0
+_PUBSPEC_SDK = re.compile(r"""sdk:\s*['"]?[>=^\s]*(\d+(?:\.\d+){0,2})""")
+
+# Android Gradle:  compileSdk 35  /  minSdk 24
+_ANDROID_SDK = re.compile(r"\b(?:compileSdk|targetSdk)(?:Version)?\s*=?\s*(\d+)")
 
 # 태그 없는 이미지:  image: redis
 # 버전은 모르지만 쓰인 것은 확실하다. 놓치면 인프라 글에서 스택이 텅 빈다.
@@ -307,6 +353,31 @@ def detect(markdown: str) -> List[DetectedStack]:
             if name:
                 _add(found, DetectedStack(name, _short_version(version), "high", "이미지 태그"))
 
+        # Podfile 은 Ruby 문법이라 ```ruby 로 적는 사람이 많다.
+        # 그대로 두면 iOS 글이 "Ruby 글" 이 된다. 명확한 표식이 있으면 ruby 를 지운다.
+        is_podfile = bool(_PODFILE_PLATFORM.search(content) or _PODFILE_POD.search(content))
+        if is_podfile:
+            found.pop("ruby", None)
+        for platform, version in _PODFILE_PLATFORM.findall(content):
+            name = normalize(platform) or ("ios" if platform.lower() == "ios" else None)
+            if name:
+                _add(found, DetectedStack(name, _short_version(version), "high", "Podfile"))
+        for raw, version in _PODFILE_POD.findall(content):
+            name = normalize(raw)
+            if name:
+                _add(
+                    found,
+                    DetectedStack(name, _short_version(version) if version else None,
+                                  "high", "Podfile"),
+                )
+
+        for version in _PUBSPEC_SDK.findall(content):
+            # pubspec 의 sdk 는 Dart SDK 다. Flutter 는 함께 쓰이므로 같이 단다.
+            _add(found, DetectedStack("dart", _short_version(version), "high", "pubspec.yaml"))
+
+        for version in _ANDROID_SDK.findall(content):
+            _add(found, DetectedStack("android", version, "high", "Gradle (Android)"))
+
         for raw in _IMAGE_PLAIN.findall(content):
             name = normalize(raw)
             if name:
@@ -332,7 +403,9 @@ def detect(markdown: str) -> List[DetectedStack]:
         for group, artifact, version in _GRADLE_DEP.findall(content):
             # group 이 org.springframework.boot 이고 artifact 가 starter-web 인 식이라
             # 둘 다 시도한다.
-            name = normalize(artifact) or normalize(group.split(".")[-1])
+            # androidx.compose.ui:ui:1.7.5 처럼 artifact 가 무의미한 경우가 있다.
+            # group 전체 → artifact → group 마지막 조각 순으로 시도한다.
+            name = normalize(group) or normalize(artifact) or normalize(group.split(".")[-1])
             if name:
                 _add(found, DetectedStack(name, _short_version(version), "high", "Gradle"))
         for version in _JAVA_VERSION.findall(content):
@@ -376,7 +449,11 @@ def detect(markdown: str) -> List[DetectedStack]:
             _add(found, DetectedStack("kubernetes", None, "medium", "쿠버네티스 매니페스트"))
 
         # 8) import — 버전은 없지만 쓰인 건 확실하다
-        for raw in _JS_IMPORT.findall(content) + _PY_IMPORT.findall(content):
+        for raw in (
+            _JS_IMPORT.findall(content)
+            + _PY_IMPORT.findall(content)
+            + _DART_IMPORT.findall(content)
+        ):
             name = normalize(raw)
             if name:
                 _add(found, DetectedStack(name, None, "medium", "import 문"))
