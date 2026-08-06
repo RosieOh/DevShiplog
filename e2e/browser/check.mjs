@@ -22,8 +22,20 @@ const ROUTES = [
   // 신선도 색(fresh/aging/stale)이 실제로 쓰이는 화면.
   // 여기를 안 보면 새 색의 대비를 검사하지 않은 채로 넘어간다.
   { path: '/stacks/react', name: 'stack' },
-  { path: process.env.E2E_POST_URL || '/@ui178598335632068/3편-178598335632068', name: 'post' },
 ]
+
+/*
+ * 글 상세는 주소를 하드코딩할 수 없다. 환경마다 DB 가 다르고, 없는 주소를 넣으면
+ * 404 페이지를 검사하게 된다 (실제로 그렇게 엉뚱한 대비 오류를 봤다).
+ * 피드에서 하나 찾아 쓰고, 글이 없으면 건너뛴다.
+ */
+try {
+  const api = process.env.E2E_API || 'http://localhost:8001'
+  const feed = await (await fetch(`${api}/api/v1/public/feed?limit=1`)).json()
+  if (feed.items?.[0]?.url) ROUTES.push({ path: feed.items[0].url, name: 'post' })
+} catch {
+  console.error('글을 못 찾아 상세 페이지 검사를 건너뜁니다')
+}
 
 // 라이트/다크 양쪽을 본다. 한쪽만 맞추면 다른 쪽이 조용히 깨진다.
 const THEMES = ['light', 'dark']
