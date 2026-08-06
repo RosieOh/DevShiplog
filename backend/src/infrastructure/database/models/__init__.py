@@ -25,6 +25,7 @@ from src.infrastructure.database.models.moderation import Report, UserBlock
 from src.infrastructure.database.models.post_view import PostView
 from src.infrastructure.database.models.password_reset import PasswordResetToken
 from src.infrastructure.database.models.tech import PostSignal, PostStack
+from src.infrastructure.database.models.product_event import ProductEvent
 
 __all__ = [
     "User",
@@ -52,4 +53,5 @@ __all__ = [
     "PasswordResetToken",
     "PostStack",
     "PostSignal",
+    "ProductEvent",
 ]
