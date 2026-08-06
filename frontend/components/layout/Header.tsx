@@ -22,6 +22,8 @@ export default function Header() {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
   const [handle, setHandle] = useState<string | null>(null)
+  // 운영 메뉴는 운영자에게만 보인다. 표시용일 뿐이고 권한 판정은 서버가 매 요청 다시 한다.
+  const [isAdmin, setIsAdmin] = useState(false)
   const toggleRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => setMenuOpen(false), [pathname])
@@ -46,7 +48,10 @@ export default function Header() {
     if (status !== 'authenticated') return
     profileService
       .me()
-      .then((me) => setHandle(me.handle))
+      .then((me) => {
+        setHandle(me.handle)
+        setIsAdmin(Boolean(me.is_admin))
+      })
       .catch(() => undefined)
   }, [status, pathname])
 
@@ -178,6 +183,16 @@ export default function Header() {
               </Link>
             </li>
           ))}
+          {isAdmin && (
+            <li className="border-t border-border-subtle">
+              <Link
+                href="/admin/reports"
+                className="flex min-h-touch items-center px-4 text-sm font-medium text-ink hover:bg-surface-2"
+              >
+                신고 처리
+              </Link>
+            </li>
+          )}
           <li className="border-t border-border-subtle">
             <button
               type="button"

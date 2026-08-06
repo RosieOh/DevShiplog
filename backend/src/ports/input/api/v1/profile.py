@@ -9,6 +9,7 @@ from src.application.use_cases.profile.update_profile import (
     CheckHandleUseCase,
     UpdateProfileUseCase,
 )
+from src.domain.enums import UserRole
 from src.ports.input.api.v1.dependencies import get_current_user_id, get_user_repo
 from src.ports.output.repositories.user_repository import UserRepository
 
@@ -40,6 +41,9 @@ def get_my_profile(
         "following_count": user.following_count,
         # handle 이 없으면 발행할 수 없다. 화면에서 온보딩을 띄우는 신호.
         "needs_handle": user.handle is None,
+        # 운영자에게만 운영 메뉴를 띄우기 위한 값.
+        # 이건 표시용일 뿐이고, 권한 판정은 서버에서 매 요청 다시 한다.
+        "is_admin": user.role is UserRole.ADMIN,
     }
 
 

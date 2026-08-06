@@ -12,6 +12,8 @@ export interface MyProfile {
   following_count: number
   /** handle 이 없으면 발행할 수 없다 */
   needs_handle: boolean
+  /** 운영 메뉴 표시용. 권한 판정은 서버가 매 요청 다시 한다. */
+  is_admin: boolean
 }
 
 export interface ProfileUpdate {
