@@ -7,7 +7,8 @@ from typing import Any, Dict, List, Optional, Sequence
 from sqlalchemy.orm import Session
 
 from src.application.errors import NotFoundError, ValidationError
-from src.domain.enums import SignalKind
+from src.application.use_cases.metrics import product_metrics as metrics
+from src.domain.enums import NotificationType, SignalKind
 from src.domain.services import tech_stack
 from src.domain.services.freshness import StackRef, evaluate
 from src.infrastructure.database.models.post import Post
@@ -99,11 +100,20 @@ def mark_verified(db: Session, post_id: str, user_id: str) -> Dict[str, Any]:
     ).update({PostSignal.resolved_at: post.verified_at}, synchronize_session=False)
 
     db.commit()
+
+    # 두 번째 검증부터가 진짜 신호다. 첫 번째는 발행 직후의 의욕이고,
+    # 두 번째는 "이 제품이 나를 다시 데려왔는가" 다.
+    metrics.record(db, metrics.POST_VERIFIED, user_id=user_id, post_id=post_id)
     return {"verified_at": post.verified_at.isoformat()}
 
 
 def send_signal(
-    db: Session, post_id: str, user_id: str, kind: str, note: Optional[str] = None
+    db: Session,
+    post_id: str,
+    user_id: str,
+    kind: str,
+    note: Optional[str] = None,
+    notification_repo=None,
 ) -> Dict[str, Any]:
     """독자가 "따라 해봤다" 를 알린다.
 
@@ -144,6 +154,24 @@ def send_signal(
             )
         )
     db.commit()
+
+    metrics.record(db, metrics.SIGNAL_SENT, user_id=user_id, post_id=post_id, kind=kind)
+
+    # "안 됐어요" 는 알려야 한다. 알리지 않으면 작성자는 /maintain 에 들어가야
+    # 신고를 보는데, 들어갈 이유가 없으면 안 들어간다. 그러면 루프가 안 돈다.
+    # "잘 됐어요" 는 알리지 않는다 — 좋은 소식으로 알림을 채우면 나쁜 소식이 묻힌다.
+    if notification_repo and signal_kind is SignalKind.BROKEN:
+        try:
+            notification_repo.create(
+                user_id=post.user_id,
+                actor_id=user_id,
+                notification_type=NotificationType.SIGNAL_BROKEN,
+                post_id=post_id,
+            )
+        except Exception:
+            # 알림 실패로 신호 자체를 잃지 않는다.
+            pass
+
     return signal_summary(db, post_id, user_id)
 
 
