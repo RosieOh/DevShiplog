@@ -18,6 +18,7 @@ from src.ports.input.api.v1.dependencies import (
     get_current_user_id,
     get_draft_repo,
     get_post_repo,
+    get_notification_repo,
     get_tag_repo,
     get_user_repo,
 )
@@ -27,6 +28,7 @@ from src.ports.output.repositories.taxonomy_repository import TagRepository
 from src.infrastructure.external import revalidation
 from src.ports.output.repositories.user_repository import UserRepository
 from src.application.use_cases.post import tech_stack as stack_service
+from src.application.use_cases.metrics import product_metrics as metrics
 from src.infrastructure.database.session import get_db
 from sqlalchemy.orm import Session
 
@@ -134,6 +136,20 @@ def publish(
         stacks = stack_service.suggest(draft_version.content_md if draft_version else "")
     saved_stacks = stack_service.replace_stacks(db, result["id"], stacks)
     result["stacks"] = [{"name": s.name, "version": s.version} for s in saved_stacks]
+
+    # 자동 추출이 쓸 만한지 판단하려면 "제안한 것" 과 "확정한 것" 을 비교해야 한다.
+    # 보정률이 0% 면 추출이 완벽하거나 아무도 안 본 것이고, 둘은 전혀 다른 상황이다.
+    suggested = stack_service.suggest(draft_version.content_md if draft_version else "")
+    metrics.record(
+        db,
+        metrics.STACK_CONFIRMED,
+        user_id=user_id,
+        post_id=result["id"],
+        suggested_count=len(suggested),
+        confirmed_count=len(saved_stacks),
+        corrected=sorted((s["name"], s["version"]) for s in suggested)
+        != sorted((s.name, s.version) for s in saved_stacks),
+    )
 
     # 공개 페이지 캐시를 깬다. 응답을 막지 않도록 백그라운드로 보낸다.
     user = user_repo.get_by_id(user_id)
@@ -369,7 +385,25 @@ def send_signal(
     payload: SignalRequest,
     user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
+    notification_repo=Depends(get_notification_repo),
 ):
     """독자가 "따라 해봤다" 를 알린다."""
     enforce_rate_limit("signal", client_identity(request, user_id))
-    return stack_service.send_signal(db, post_id, user_id, payload.kind, payload.note)
+    return stack_service.send_signal(
+        db, post_id, user_id, payload.kind, payload.note, notification_repo
+    )
+
+
+@router.get("/metrics/product")
+def product_metrics_summary(
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """신선도 기능이 실제로 값어치가 있는가.
+
+    지금은 로그인한 사람이면 볼 수 있게 열어 둔다. 운영자 개념이 아직 없고,
+    개인정보가 아니라 집계값만 나가기 때문이다. 운영자 역할이 생기면 좁힌다.
+
+    숫자만 보면 "나쁘지 않네" 로 넘어가게 되므로 판정을 같이 낸다.
+    """
+    return metrics.summary(db)
