@@ -19,6 +19,7 @@ interface Summary {
     rate: number | null
     median_hours: number | null
   }
+  sample: { publishes: number; required: number; ready: boolean }
   verdicts: string[]
 }
 
@@ -105,10 +106,40 @@ export default function MetricsPage() {
         </p>
       </header>
 
+      {/*
+        * 표본이 모자랄 때 "부족합니다" 만 띄우면 얼마나 남았는지 알 수 없고,
+        * 그러면 이 화면을 다시 볼 이유가 없다. 진행을 보여준다.
+        */}
+      {!data.sample.ready && (
+        <div className="mt-6 rounded border border-border bg-surface p-5">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-sm font-bold text-ink">판단까지</p>
+            <p className="font-mono text-sm tabular-nums text-ink-muted">
+              {data.sample.publishes} / {data.sample.required} 건
+            </p>
+          </div>
+          <div
+            className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-2"
+            role="presentation"
+          >
+            <div
+              className="h-full rounded-full bg-accent"
+              style={{
+                width: `${Math.min(100, (data.sample.publishes / data.sample.required) * 100)}%`,
+              }}
+            />
+          </div>
+          <p className="mt-3 text-sm leading-relaxed text-ink-muted">
+            표본이 모이기 전에는 아래 수치를 근거로 쓰지 않습니다. 5건으로 “루프가 안 돈다”고
+            접으면 그건 측정이 아니라 성급함입니다.
+          </p>
+        </div>
+      )}
+
       {/* 판정을 위에 둔다. 숫자만 보면 "나쁘지 않네" 로 넘어간다. */}
       <ul className="mt-6 space-y-2">
         {data.verdicts.map((verdict) => {
-          const neutral = verdict.includes('표본') || verdict.includes('넘습니다')
+          const neutral = verdict.includes('이릅니다') || verdict.includes('넘습니다')
           return (
             <li
               key={verdict}
@@ -124,7 +155,11 @@ export default function MetricsPage() {
         })}
       </ul>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+      <div
+        className={`mt-6 grid gap-4 lg:grid-cols-3 ${
+          data.sample.ready ? '' : 'opacity-60'
+        }`}
+      >
         <Metric
           label="1 · 추출 품질"
           value={pct(sc.rate)}
