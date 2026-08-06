@@ -131,3 +131,14 @@ class SignalKind(str, enum.Enum):
 
     WORKS = "works"      # 따라 해봤고 됐다
     BROKEN = "broken"    # 따라 해봤는데 안 된다
+
+
+class UserRole(str, enum.Enum):
+    """사용자 역할.
+
+    지금은 둘뿐이다. 세분화(모더레이터/관리자)는 실제로 사람이 여럿 붙을 때 나눈다 —
+    쓰는 사람이 하나인데 역할을 셋으로 나누면 관리만 늘고 얻는 게 없다.
+    """
+
+    USER = "user"
+    ADMIN = "admin"

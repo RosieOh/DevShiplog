@@ -1,8 +1,9 @@
-from sqlalchemy import Column, DateTime, Integer, String, Text
+from sqlalchemy import Column, DateTime, Enum, Integer, String, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
 
+from src.domain.enums import UserRole
 from src.infrastructure.database.session import Base
 
 __all__ = ["User"]
@@ -39,6 +40,12 @@ class User(Base):
     drafts = relationship("Draft", back_populates="user", cascade="all, delete-orphan")
     jobs = relationship("Job", back_populates="user", cascade="all, delete-orphan")
     usage_logs = relationship("UsageLog", back_populates="user", cascade="all, delete-orphan")
+    # 운영자 여부.
+    #
+    # 신고는 쌓이는데 처리할 사람이 없으면 신고 기능은 장식이다.
+    # 별도 테이블로 빼지 않는다 — 역할이 둘뿐이고 사용자당 하나다.
+    role = Column(Enum(UserRole), nullable=False, default=UserRole.USER, server_default="USER")
+
     templates = relationship("Template", back_populates="user", cascade="all, delete-orphan")
     schedules = relationship("Schedule", back_populates="user", cascade="all, delete-orphan")
 
