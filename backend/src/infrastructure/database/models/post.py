@@ -44,6 +44,12 @@ class Post(Base):
     published_at = Column(DateTime, server_default=func.now(), index=True)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
+    # 마지막으로 "지금도 동작한다" 고 작성자가 확인한 시각.
+    #
+    # published_at 과 다른 개념이다. 작성일은 글이 맞는지와 상관이 없다 —
+    # 2년 전 글도 어제 다시 돌려봤다면 믿을 수 있다.
+    verified_at = Column(DateTime, index=True)
+
     # 정렬·표시에 매번 COUNT 를 돌리지 않기 위한 비정규화 카운터
     like_count = Column(Integer, nullable=False, default=0)
     comment_count = Column(Integer, nullable=False, default=0)
@@ -55,6 +61,11 @@ class Post(Base):
     comments = relationship("Comment", back_populates="post", cascade="all, delete-orphan")
     likes = relationship("PostLike", back_populates="post", cascade="all, delete-orphan")
     series_links = relationship("SeriesPost", back_populates="post", cascade="all, delete-orphan")
+    stacks = relationship(
+        "PostStack", back_populates="post", cascade="all, delete-orphan",
+        order_by="PostStack.position",
+    )
+    signals = relationship("PostSignal", back_populates="post", cascade="all, delete-orphan")
 
     __table_args__ = (
         # 공개 URL 은 /@handle/slug 이므로 사용자 안에서만 유일하면 된다.

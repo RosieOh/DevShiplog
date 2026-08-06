@@ -20,12 +20,29 @@ export interface Author {
   bio: string | null
 }
 
+export interface PostStack {
+  name: string
+  version: string | null
+}
+
+export interface Freshness {
+  /** fresh: 최근 검증 · aging: 확인 필요 · stale: 낡음 · unverified: 검증 이력 없음 */
+  level: 'fresh' | 'aging' | 'stale' | 'unverified'
+  days_since_verified: number | null
+  outdated: { name: string; version: string; latest_major: number }[]
+  /** 화면에 그대로 쓸 수 있는 한 줄 설명 */
+  reason: string
+  verified_at: string | null
+}
+
 export interface PostCard {
   id: string
   slug: string
   title: string
   summary: string | null
   cover_url: string | null
+  stacks: PostStack[]
+  freshness: Freshness
   published_at: string | null
   like_count: number
   comment_count: number
@@ -62,6 +79,7 @@ export interface PostDetail extends PostCard {
   is_following_author: boolean
   is_mine: boolean
   series: SeriesNavData | null
+  signals: { works: number; broken: number; my_signal: 'works' | 'broken' | null }
 }
 
 export interface BlogHome extends Author {
@@ -131,6 +149,41 @@ export function getFeed(
   q.set('limit', String(params.limit ?? 20))
   q.set('offset', String(params.offset ?? 0))
   return getJson<PostList>(`/feed?${q}`, { tags: [cacheTags.feed], revalidate: 30 })
+}
+
+export interface StackSummary {
+  name: string
+  post_count: number
+}
+
+export function getPopularStacks(limit = 40) {
+  return getJson<StackSummary[]>(`/stacks?limit=${limit}`, {
+    tags: [cacheTags.feed],
+    revalidate: 300,
+  })
+}
+
+export type StackSort = 'fresh_first' | 'recent' | 'trending'
+
+/**
+ * 이 스택으로 쓰인 글.
+ *
+ * 기본 정렬이 fresh_first 인 것이 이 제품의 입장이다.
+ * 최신순으로 두면 "최근에 쓴 낡은 글" 이 위로 온다. 독자가 원하는 건
+ * 최근에 쓴 글이 아니라 지금도 되는 글이다.
+ */
+export function getPostsByStack(
+  name: string,
+  params: { version?: string; sort?: StackSort; limit?: number } = {}
+) {
+  const q = new URLSearchParams()
+  if (params.version) q.set('version', params.version)
+  q.set('sort', params.sort ?? 'fresh_first')
+  q.set('limit', String(params.limit ?? 24))
+  return getJson<PostList>(`/stacks/${encodeURIComponent(name)}?${q}`, {
+    tags: [cacheTags.feed],
+    revalidate: 60,
+  })
 }
 
 export function searchPosts(query: string, limit = 20) {

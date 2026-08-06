@@ -5,6 +5,8 @@ export interface PublishRequest {
   title: string
   tags: string[]
   cover_url?: string
+  /** 이 글이 전제하는 기술과 버전. 생략하면 본문에서 자동 추출한다. */
+  stacks?: { name: string; version: string | null }[]
   /** 민감정보 경고를 확인하고도 진행하겠다는 명시적 동의 */
   allow_sensitive?: boolean
 }

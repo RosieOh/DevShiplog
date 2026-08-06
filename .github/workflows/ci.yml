@@ -325,6 +325,7 @@ jobs:
           python e2e/platform_e2e.py
           python e2e/features_e2e.py
           python e2e/improve_e2e.py
+          python e2e/freshness_e2e.py
 
       - name: 브라우저 검증
         working-directory: e2e/browser

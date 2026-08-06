@@ -6,6 +6,9 @@ import Markdown from '@/components/blog/Markdown'
 import PostActions from '@/components/blog/PostActions'
 import CommentSection from '@/components/blog/CommentSection'
 import SeriesNav from '@/components/blog/SeriesNav'
+import StackBadges from '@/components/blog/StackBadges'
+import FreshnessBanner from '@/components/blog/FreshnessBadge'
+import WorksSignal from '@/components/blog/WorksSignal'
 import TableOfContents from '@/components/blog/TableOfContents'
 import FloatingActions from '@/components/blog/FloatingActions'
 import { extractToc } from '@/lib/toc'
@@ -110,7 +113,22 @@ export default async function PostPage({ params }: Props) {
             <time dateTime={post.published_at ?? undefined}>{formatDate(post.published_at)}</time>
             <span aria-hidden="true">·</span>
             <span>조회 {post.view_count}</span>
+            {post.freshness.verified_at && (
+              <>
+                <span aria-hidden="true">·</span>
+                {/* 작성일이 아니라 마지막으로 "지금도 된다" 고 확인한 시각 */}
+                <span className="text-fresh">
+                  {formatDate(post.freshness.verified_at)} 검증
+                </span>
+              </>
+            )}
           </div>
+
+          {post.stacks.length > 0 && (
+            <div className="mt-4">
+              <StackBadges stacks={post.stacks} />
+            </div>
+          )}
 
           {post.tags.length > 0 && (
             <ul className="mt-5 flex flex-wrap gap-2">
@@ -137,6 +155,11 @@ export default async function PostPage({ params }: Props) {
           />
         )}
 
+        {/* 읽기 시작하기 전에 알아야 한다. 다 읽고 나서 "낡은 글이었다" 는 늦다. */}
+        <div className="mt-8">
+          <FreshnessBanner freshness={post.freshness} />
+        </div>
+
         {/* 본문 앞: "지금 몇 편을 읽고 있는지" 를 먼저 알려준다. */}
         {post.series && (
           <div className="mt-10">
@@ -150,6 +173,10 @@ export default async function PostPage({ params }: Props) {
 
         {/* 본문 뒤: 다 읽은 사람에게 다음 편으로 가는 길. */}
         {post.series && <SeriesNav series={post.series} />}
+
+        <div className="mb-8">
+          <WorksSignal postId={post.id} initial={post.signals} isMine={post.is_mine} />
+        </div>
 
         <PostActions
           postId={post.id}

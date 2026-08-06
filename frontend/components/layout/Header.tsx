@@ -12,6 +12,7 @@ import { profileService } from '@/features/profile/services/profileService'
 
 const APP_NAV = [
   { href: '/dashboard', label: '내 글' },
+  { href: '/maintain', label: '글 관리' },
   { href: '/notifications', label: '알림' },
   { href: '/settings', label: '설정' },
 ]

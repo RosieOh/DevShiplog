@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import Avatar from '@/components/ui/Avatar'
+import StackBadges from '@/components/blog/StackBadges'
+import { FreshnessDot } from '@/components/blog/FreshnessBadge'
 import type { PostCard as PostCardData } from '@/lib/api/public'
 import { formatDate } from '@/lib/api/public'
 
@@ -34,6 +36,12 @@ export default function PostCard({ post }: { post: PostCardData }) {
           )}
         </Link>
 
+        {post.stacks.length > 0 && (
+          <div className="mt-3">
+            <StackBadges stacks={post.stacks.slice(0, 3)} size="compact" />
+          </div>
+        )}
+
         {post.tags.length > 0 && (
           <ul className="mt-3 flex flex-wrap gap-1.5">
             {post.tags.slice(0, 3).map((tag) => (
@@ -49,11 +57,14 @@ export default function PostCard({ post }: { post: PostCardData }) {
           </ul>
         )}
 
-        <p className="mt-3 flex-1 text-xs text-ink-faint">
+        <div className="mt-3 flex flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-faint">
           <time dateTime={post.published_at ?? undefined}>{formatDate(post.published_at)}</time>
-          {' · '}
-          {post.comment_count}개의 댓글
-        </p>
+          <span aria-hidden="true">·</span>
+          <span>{post.comment_count}개의 댓글</span>
+          {/* 클릭한 뒤에야 낡은 글인 걸 알면 독자의 시간을 이미 쓴 뒤다. */}
+          <span aria-hidden="true">·</span>
+          <FreshnessDot freshness={post.freshness} />
+        </div>
       </div>
 
       <div className="flex items-center justify-between gap-3 border-t border-border-subtle px-4 py-3">
