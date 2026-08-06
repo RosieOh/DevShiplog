@@ -95,6 +95,11 @@ class NotificationType(str, enum.Enum):
     REPLY = "reply"
     LIKE = "like"
     FOLLOW = "follow"
+    # 독자가 "안 됐어요" 를 눌렀다.
+    #
+    # 이게 없으면 갱신 루프가 돌지 않는다. 작성자는 /maintain 에 들어가야
+    # 신고를 보는데, 들어갈 이유가 없으면 안 들어간다.
+    SIGNAL_BROKEN = "signal_broken"
 
 
 class ReportTargetType(str, enum.Enum):

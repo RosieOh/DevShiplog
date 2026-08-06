@@ -12,7 +12,7 @@ export interface FollowResult {
 
 export interface NotificationItem {
   id: string
-  type: 'comment' | 'reply' | 'like' | 'follow'
+  type: 'comment' | 'reply' | 'like' | 'follow' | 'signal_broken'
   actor: { handle: string; display_name: string; avatar_url: string | null }
   post: { title: string; url: string } | null
   read: boolean
