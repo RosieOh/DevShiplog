@@ -101,6 +101,18 @@ class PostRepository(ABC):
         ...
 
     @abstractmethod
+    def list_by_stack(
+        self,
+        name: str,
+        version: Optional[str] = None,
+        sort: str = "fresh_first",
+        limit: int = 20,
+        offset: int = 0,
+    ) -> List["Post"]:
+        """이 스택으로 쓰인 글. fresh_first 는 검증이 최근인 것을 앞에 둔다."""
+        ...
+
+    @abstractmethod
     def search(self, query: str, limit: int, offset: int) -> List["Post"]:
         ...
 
