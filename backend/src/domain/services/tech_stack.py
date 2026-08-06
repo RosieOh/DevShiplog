@@ -62,14 +62,32 @@ ALIASES: Dict[str, str] = {
     "vite": "vite", "webpack": "webpack", "esbuild": "esbuild",
     "jest": "jest", "vitest": "vitest", "pytest": "pytest", "playwright": "playwright",
     "celery": "celery", "graphql": "graphql",
+    "gunicorn": "gunicorn", "uvicorn": "uvicorn", "uwsgi": "uwsgi",
     # JVM·Rust·Ruby·.NET 생태계
     "spring-boot-starter-parent": "spring-boot", "spring-boot-starter-web": "spring-boot",
-    "spring-boot-starter": "spring-boot", "boot": "spring-boot",
+    "spring-boot-starter": "spring-boot",
+    "spring-boot": "spring-boot", "springboot": "spring-boot",
+    "spring boot": "spring-boot", "spring framework": "spring", "spring": "spring",
+    # Gradle 플러그인 id 는 역DNS 다. 마지막 조각("boot")을 별칭으로 걸면
+    # "Spring Framework" 의 Framework 처럼 일반 명사가 오탐을 만든다.
+    # 전체 id 를 그대로 적는 편이 안전하다.
+    "org.springframework.boot": "spring-boot",
+    "io.spring.dependency-management": "spring",
+    "react native": "react-native", "react-native": "react-native",
     "tokio": "tokio", "serde": "serde", "axum": "axum",
-    "dotnet": "dotnet", "net": "dotnet", "aspnetcore": "dotnet",
+    "dotnet": "dotnet", "aspnetcore": "dotnet",
     "puma": "puma", "sidekiq": "sidekiq",
-    "laravel": "laravel", "framework": "laravel", "symfony": "symfony",
+    "laravel": "laravel", "symfony": "symfony",
     "java": "java",
+    # 한글 표기. 실제 글에 "자바 17 버전", "스프링에서" 처럼 쓴다.
+    # 한국어 블로그가 대상인 제품이 이걸 못 읽으면 산문에서 절반을 놓친다.
+    "자바": "java", "코틀린": "kotlin", "파이썬": "python", "파이선": "python",
+    "스프링": "spring", "스프링부트": "spring-boot", "장고": "django",
+    "리액트": "react", "리엑트": "react", "뷰": "vue", "스벨트": "svelte",
+    "노드": "nodejs", "타입스크립트": "typescript", "자바스크립트": "javascript",
+    "도커": "docker", "쿠버네티스": "kubernetes", "쿠베": "kubernetes",
+    "레디스": "redis", "몽고": "mongodb", "포스트그레스": "postgresql",
+    "고랭": "go", "러스트": "rust", "루비": "ruby",
 }
 
 # 코드 펜스 언어 → 스택. 언어는 확실한 신호다.
@@ -100,10 +118,18 @@ _FENCE = re.compile(r"^\s*```([\w+#.-]*)", re.MULTILINE)
 # 이름과 버전 사이에 조사가 끼는 것도 받는다. "React 도 18", "Next 는 14".
 # 한국어로 쓰면 흔한 형태인데, 이걸 놓치면 산문에서 버전을 거의 못 뽑는다.
 _PARTICLE = r"(?:\s*(?:은|는|이|가|을|를|도|의|에서|로|으로)\s*)?"
+# 두 단어 이름을 받는다. "Spring Boot 3.2.x", "Spring Framework 6.1", "React Native 0.76".
+# 한 토큰만 보면 "Boot" 나 "Framework" 를 잡게 되는데, 그건 일반 명사라
+# 별칭으로 걸 수 없다 (실제로 "Spring Framework 6.1" 을 laravel 로 잡은 적이 있다).
 _NAMED_VERSION = re.compile(
-    r"(?<![A-Za-z0-9])([A-Za-z][A-Za-z0-9.#+_-]{1,20}|리액트)"
+    r"(?<![A-Za-z0-9])([A-Za-z][A-Za-z0-9.#+_-]{1,20}(?:\s+[A-Z][A-Za-z]{1,12})?|[가-힣]{2,8})"
     + _PARTICLE
-    + r"\s*v?\s*(\d+(?:\.\d+){0,2})(?![\d.])"
+    # `3.2.x` 를 받는다. "Spring Boot 3.2.x 버전" 은 한국어 글에서 아주 흔하고,
+    # 뜻은 "3.2 계열" 이므로 3.2 로 읽으면 된다.
+    + r"\s*v?\s*(\d+(?:\.\d+){0,2})(?:\.x)?(?![\d.])"
+    # "Java 8 이상" 은 최소 요구사항이지 이 글의 전제가 아니다.
+    # 이걸 전제로 잡으면 Spring Boot 3 글이 "Java 8 기준" 이 되어 정반대가 된다.
+    + r"(?!\s*(?:이상|이하|미만|초과))"
 )
 
 # 마이그레이션 글의 "14 에서 15 로", "18 → 19".
@@ -162,6 +188,10 @@ _IMAGE_TAG = re.compile(
 # go.mod 의 `go 1.23` 한 줄. go 글이면 거의 항상 있다.
 _GO_MOD = re.compile(r"^\s*go\s+(\d+\.\d+(?:\.\d+)?)\s*$", re.MULTILINE)
 
+# 태그 없는 이미지:  image: redis
+# 버전은 모르지만 쓰인 것은 확실하다. 놓치면 인프라 글에서 스택이 텅 빈다.
+_IMAGE_PLAIN = re.compile(r"^\s*image:\s*([a-zA-Z][\w-]*)\s*$", re.MULTILINE)
+
 # lock 파일·YAML 의 `vite: 6.0.3` 형태.
 # 아는 이름일 때만 받는다. 아무 key:value 나 받으면 설정값이 버전으로 둔갑한다.
 _YAML_VERSION = re.compile(
@@ -177,11 +207,21 @@ MAX_STACKS = 12
 
 def normalize(raw: str) -> Optional[str]:
     """표기가 어떻든 하나의 이름으로. 모르는 것은 None (추측하지 않는다)."""
-    key = raw.strip().lower().lstrip("@")
-    # npm 스코프 패키지: @types/react → react 로 뭉개지 않는다. 스코프는 버린다.
+    key = " ".join(raw.strip().lower().split())
+    key = key.lstrip("@")
     if "/" in key:
-        key = key.split("/")[-1]
-    return ALIASES.get(key)
+        vendor, _, package = key.partition("/")
+        # @types/react 는 뒤(react)가, laravel/framework 는 앞(laravel)이 답이다.
+        # 둘 다 시도하되 뒤를 먼저 본다 — npm 쪽이 훨씬 흔하다.
+        return ALIASES.get(package) or ALIASES.get(vendor)
+    if key in ALIASES:
+        return ALIASES[key]
+    # "Spring Boot" 는 알지만 "Spring Cloud" 는 모른다.
+    # 두 단어를 모르면 첫 단어로 되돌아간다 — "Spring Cloud 4" 는 spring 으로 읽는 편이
+    # 아무것도 안 읽는 것보다 낫다.
+    if " " in key:
+        return ALIASES.get(key.split()[0])
+    return None
 
 
 def _short_version(version: str) -> str:
@@ -266,6 +306,11 @@ def detect(markdown: str) -> List[DetectedStack]:
             name = normalize(raw)
             if name:
                 _add(found, DetectedStack(name, _short_version(version), "high", "이미지 태그"))
+
+        for raw in _IMAGE_PLAIN.findall(content):
+            name = normalize(raw)
+            if name:
+                _add(found, DetectedStack(name, None, "high", "이미지 (태그 없음)"))
 
         # 4) go.mod
         for version in _GO_MOD.findall(content):
