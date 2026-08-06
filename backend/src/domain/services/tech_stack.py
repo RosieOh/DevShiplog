@@ -62,6 +62,14 @@ ALIASES: Dict[str, str] = {
     "vite": "vite", "webpack": "webpack", "esbuild": "esbuild",
     "jest": "jest", "vitest": "vitest", "pytest": "pytest", "playwright": "playwright",
     "celery": "celery", "graphql": "graphql",
+    # JVM·Rust·Ruby·.NET 생태계
+    "spring-boot-starter-parent": "spring-boot", "spring-boot-starter-web": "spring-boot",
+    "spring-boot-starter": "spring-boot", "boot": "spring-boot",
+    "tokio": "tokio", "serde": "serde", "axum": "axum",
+    "dotnet": "dotnet", "net": "dotnet", "aspnetcore": "dotnet",
+    "puma": "puma", "sidekiq": "sidekiq",
+    "laravel": "laravel", "framework": "laravel", "symfony": "symfony",
+    "java": "java",
 }
 
 # 코드 펜스 언어 → 스택. 언어는 확실한 신호다.
@@ -79,9 +87,60 @@ FENCE_LANGUAGES: Dict[str, str] = {
 _FENCE = re.compile(r"^\s*```([\w+#.-]*)", re.MULTILINE)
 
 # "React 18", "Python 3.12", "Next.js 14.2" — 사람이 본문에 적는 방식
+# "React 18", "Python 3.12", "React 18버전", "Next v14"
+#
+# `\b` 를 쓰지 않는다. 파이썬 정규식은 한글도 단어 문자로 보기 때문에
+# "18버전" 의 8과 버 사이, "3.12를" 의 2와 를 사이에 경계가 생기지 않는다.
+# 그래서 "React 18버전" 은 버전을 통째로 놓쳤고 "Python 3.12를" 은 3만 잡혔다.
+# 한국어 개발 블로그가 대상인 제품에서 이건 치명적이다.
+#
+# 대신 ASCII 기준으로 명시한다.
+#   앞: ASCII 영숫자가 아니어야 한다 (단어 중간을 잡지 않게)
+#   뒤: 숫자나 점이 아니어야 한다 (3.12 를 3 으로 자르지 않게)
+# 이름과 버전 사이에 조사가 끼는 것도 받는다. "React 도 18", "Next 는 14".
+# 한국어로 쓰면 흔한 형태인데, 이걸 놓치면 산문에서 버전을 거의 못 뽑는다.
+_PARTICLE = r"(?:\s*(?:은|는|이|가|을|를|도|의|에서|로|으로)\s*)?"
 _NAMED_VERSION = re.compile(
-    r"\b([A-Za-z][\w.#+-]{1,20}|리액트)\s*[ v]?(\d+(?:\.\d+){0,2})\b"
+    r"(?<![A-Za-z0-9])([A-Za-z][A-Za-z0-9.#+_-]{1,20}|리액트)"
+    + _PARTICLE
+    + r"\s*v?\s*(\d+(?:\.\d+){0,2})(?![\d.])"
 )
+
+# 마이그레이션 글의 "14 에서 15 로", "18 → 19".
+# 이런 글의 전제는 **올린 뒤** 버전이다. 앞 숫자를 잡으면 정반대가 된다.
+_UPGRADE = re.compile(r"(\d+(?:\.\d+){0,2})\s*(?:에서|->|→)\s*(\d+(?:\.\d+){0,2})(?![\d.])")
+
+# --- 빌드 파일 -----------------------------------------------------------
+# JVM·Rust·Ruby·.NET 생태계는 앞선 규칙으로 하나도 안 잡혔다.
+# 사용자 층이 작지 않으므로 각각의 관용 표기를 따로 본다.
+
+# Gradle:  id 'org.springframework.boot' version '3.4.1'
+#          implementation 'com.example:artifact:1.2.3'
+_GRADLE_PLUGIN = re.compile(r"""id\s*[('"]+([\w.-]+)['")\s]+version\s*['"]([\d.]+)['"]""")
+_GRADLE_DEP = re.compile(r"""['"]([\w.-]+):([\w.-]+):([\d][\d.]*)['"]""")
+# JavaVersion.VERSION_21 / sourceCompatibility = 17
+_JAVA_VERSION = re.compile(r"(?:JavaVersion\.VERSION_|sourceCompatibility\s*=\s*)(\d+)")
+
+# Maven:  <artifactId>spring-boot-starter-parent</artifactId> ... <version>3.2.5</version>
+_MAVEN_ARTIFACT = re.compile(
+    r"<artifactId>([\w.-]+)</artifactId>\s*<version>([\d.]+)</version>", re.S
+)
+_MAVEN_PROPERTY = re.compile(r"<([\w.]+)\.version>([\d.]+)</[\w.]+\.version>")
+
+# Cargo:  tokio = { version = "1.42" }  /  serde = "1.0"  /  rust-version = "1.83"
+_CARGO_DEP = re.compile(
+    r"""^\s*([\w-]+)\s*=\s*(?:\{[^}]*version\s*=\s*)?["']([\d.]+)["']""", re.MULTILINE
+)
+
+# Gemfile:  ruby '3.3.6'  /  gem 'rails', '~> 7.2.2'
+_GEMFILE_RUBY = re.compile(r"""^\s*ruby\s+['"]([\d.]+)['"]""", re.MULTILINE)
+_GEMFILE_GEM = re.compile(r"""^\s*gem\s+['"]([\w-]+)['"](?:\s*,\s*['"][~><=^\s]*([\d.]+)['"])?""",
+                          re.MULTILINE)
+
+# .NET:  <TargetFramework>net8.0</TargetFramework>
+#        <PackageReference Include="X" Version="8.0.3" />
+_DOTNET_TFM = re.compile(r"<TargetFramework>net([\d.]+)</TargetFramework>")
+_DOTNET_PKG = re.compile(r"""<PackageReference\s+Include=["']([\w.]+)["']\s+Version=["']([\d.]+)["']""")
 
 # package.json 의존성 줄:  "react": "^18.3.1"
 _NPM_DEP = re.compile(r'"([@\w/.-]+)"\s*:\s*"[\^~>=<]*(\d+(?:\.\d+){0,2})')
@@ -218,28 +277,88 @@ def detect(markdown: str) -> List[DetectedStack]:
             if name:
                 _add(found, DetectedStack(name, _short_version(version), "medium", "잠금 파일"))
 
-        # 6) 쿠버네티스 매니페스트
+        # 6) 빌드 파일 — 생태계마다 관용 표기가 전혀 다르다
+        for raw, version in _GRADLE_PLUGIN.findall(content):
+            # 플러그인 id 는 org.springframework.boot 처럼 전체 경로다.
+            # 마지막 조각(boot)에 별칭을 걸어 두었으므로 그쪽도 시도한다.
+            name = normalize(raw) or normalize(raw.split(".")[-1])
+            if name:
+                _add(found, DetectedStack(name, _short_version(version), "high", "Gradle"))
+        for group, artifact, version in _GRADLE_DEP.findall(content):
+            # group 이 org.springframework.boot 이고 artifact 가 starter-web 인 식이라
+            # 둘 다 시도한다.
+            name = normalize(artifact) or normalize(group.split(".")[-1])
+            if name:
+                _add(found, DetectedStack(name, _short_version(version), "high", "Gradle"))
+        for version in _JAVA_VERSION.findall(content):
+            _add(found, DetectedStack("java", version, "high", "Gradle"))
+
+        for artifact, version in _MAVEN_ARTIFACT.findall(content):
+            name = normalize(artifact) or normalize(artifact.split("-")[0])
+            if name:
+                _add(found, DetectedStack(name, _short_version(version), "high", "Maven"))
+        for prop, version in _MAVEN_PROPERTY.findall(content):
+            name = normalize(prop)
+            if name:
+                _add(found, DetectedStack(name, _short_version(version), "high", "Maven"))
+
+        for raw, version in _CARGO_DEP.findall(content):
+            name = "rust" if raw == "rust-version" else normalize(raw)
+            if name:
+                _add(found, DetectedStack(name, _short_version(version), "high", "Cargo.toml"))
+
+        for version in _GEMFILE_RUBY.findall(content):
+            _add(found, DetectedStack("ruby", _short_version(version), "high", "Gemfile"))
+        for raw, version in _GEMFILE_GEM.findall(content):
+            name = normalize(raw)
+            if name:
+                _add(
+                    found,
+                    DetectedStack(name, _short_version(version) if version else None,
+                                  "high", "Gemfile"),
+                )
+
+        for version in _DOTNET_TFM.findall(content):
+            _add(found, DetectedStack("dotnet", _short_version(version), "high", ".NET csproj"))
+            _add(found, DetectedStack("csharp", None, "medium", ".NET csproj"))
+        for raw, version in _DOTNET_PKG.findall(content):
+            name = normalize(raw) or normalize(raw.split(".")[0])
+            if name:
+                _add(found, DetectedStack(name, _short_version(version), "high", ".NET csproj"))
+
+        # 7) 쿠버네티스 매니페스트
         if _K8S.search(content):
             _add(found, DetectedStack("kubernetes", None, "medium", "쿠버네티스 매니페스트"))
 
-        # 7) import — 버전은 없지만 쓰인 건 확실하다
+        # 8) import — 버전은 없지만 쓰인 건 확실하다
         for raw in _JS_IMPORT.findall(content) + _PY_IMPORT.findall(content):
             name = normalize(raw)
             if name:
                 _add(found, DetectedStack(name, None, "medium", "import 문"))
 
-    # 8) 산문의 "React 18" 같은 표현
+    # 9) 산문의 "React 18" 같은 표현
     prose = _prose(markdown)
     for raw, version in _NAMED_VERSION.findall(prose):
         name = normalize(raw)
         if name:
             _add(found, DetectedStack(name, _short_version(version), "medium", f"본문의 “{raw} {version}”"))
 
-    # 9) 버전 없이 이름만 언급된 것
-    for raw in re.findall(r"\b([A-Za-z][\w.#+-]{1,20})\b", prose):
+    # 10) 버전 없이 이름만 언급된 것
+    # 여기도 \b 를 쓰면 "Django의" 가 통째로 잡혀 정규화에 실패한다.
+    for raw in re.findall(r"(?<![A-Za-z0-9])([A-Za-z][A-Za-z0-9.#+_-]{1,20})", prose):
         name = normalize(raw)
         if name and name not in found:
             _add(found, DetectedStack(name, None, "low", "본문 언급"))
+
+    # 마이그레이션 글: "14 에서 15 로" 는 15 가 전제다.
+    # 산문에서 위 규칙은 앞 숫자(14)를 잡으므로 여기서 바로잡는다.
+    for before, after in _UPGRADE.findall(prose):
+        for stack in list(found.values()):
+            if stack.version and _short_version(before).startswith(stack.version.split(".")[0]):
+                found[stack.name] = DetectedStack(
+                    stack.name, _short_version(after), stack.confidence,
+                    f"{stack.evidence} (마이그레이션 후 버전)",
+                )
 
     order = {"high": 0, "medium": 1, "low": 2}
     ranked = sorted(
