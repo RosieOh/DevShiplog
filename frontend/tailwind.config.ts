@@ -40,6 +40,11 @@ const config: Config = {
           contrast: withAlpha('accent-contrast'),
         },
         danger: withAlpha('danger'),
+        // 신선도는 이 제품의 핵심 어휘다. 화면마다 색을 직접 적으면 곧 어긋나고,
+        // "이 초록이 그 초록인가" 를 매번 판단하게 된다.
+        fresh: withAlpha('fresh'),
+        aging: withAlpha('aging'),
+        stale: withAlpha('stale'),
         warning: withAlpha('warning'),
       },
       borderRadius: {
@@ -57,6 +62,8 @@ const config: Config = {
       fontFamily: {
         mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
+      // 신선도는 이 제품의 핵심 어휘다. 색을 화면마다 직접 적으면 곧 어긋난다.
+      // (아래 세 색은 globals.css 에서 라이트/다크가 각각 정의된다.)
       minHeight: { touch: '44px' },
       minWidth: { touch: '44px' },
       /*
