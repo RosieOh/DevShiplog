@@ -115,3 +115,14 @@ class ReportStatus(str, enum.Enum):
     OPEN = "open"
     RESOLVED = "resolved"
     REJECTED = "rejected"
+
+
+class SignalKind(str, enum.Enum):
+    """독자가 보내는 "지금도 되나요?" 신호.
+
+    좋아요와 다르다. 좋아요는 "좋았다" 고, 이건 "따라 해봤다" 다.
+    따라 해본 사람만 보낼 수 있는 신호라 수가 적지만 훨씬 무겁다.
+    """
+
+    WORKS = "works"      # 따라 해봤고 됐다
+    BROKEN = "broken"    # 따라 해봤는데 안 된다

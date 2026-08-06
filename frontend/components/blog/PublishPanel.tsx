@@ -8,10 +8,18 @@ import { useToastStore } from '@/store/toastStore'
 import { AlertIcon, CheckCircleIcon } from '@/components/ui/icons'
 import { revalidateContent, tagsForPostUrl } from '@/lib/revalidate'
 import ImageUploader from '@/components/ui/ImageUploader'
+import StackEditor, { type StackDraft } from '@/components/blog/StackEditor'
 
 const MAX_TAGS = 10
 
-export default function PublishPanel({ draftId }: { draftId: string }) {
+export default function PublishPanel({
+  draftId,
+  contentMd = '',
+}: {
+  draftId: string
+  /** 스택 자동 추출에 쓴다. 없으면 추출을 건너뛰고 직접 입력만 받는다. */
+  contentMd?: string
+}) {
   const { addToast } = useToastStore()
   const [profile, setProfile] = useState<MyProfile | null>(null)
   const [state, setState] = useState<DraftPublishState | null>(null)
@@ -19,6 +27,7 @@ export default function PublishPanel({ draftId }: { draftId: string }) {
   const [tagInput, setTagInput] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [coverUrl, setCoverUrl] = useState<string | null>(null)
+  const [stacks, setStacks] = useState<StackDraft[]>([])
   const [busy, setBusy] = useState(false)
   // 민감정보 경고를 한 번 본 뒤에만 강행할 수 있게 한다.
   const [sensitiveWarned, setSensitiveWarned] = useState(false)
@@ -57,6 +66,7 @@ export default function PublishPanel({ draftId }: { draftId: string }) {
         title: title.trim(),
         tags,
         cover_url: coverUrl ?? undefined,
+        stacks: stacks.map((s) => ({ name: s.name, version: s.version })),
         allow_sensitive: allowSensitive,
       })
       setState({ published: true, ...result })
@@ -174,6 +184,9 @@ export default function PublishPanel({ draftId }: { draftId: string }) {
             )}
           </div>
         </div>
+
+        {/* 태그보다 위에 둔다. 스택은 글의 전제이고 태그는 분류다. */}
+        <StackEditor contentMd={contentMd} value={stacks} onChange={setStacks} />
 
         <div>
           <label htmlFor="publish-tags" className="block text-sm font-semibold text-ink">

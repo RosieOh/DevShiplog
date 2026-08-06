@@ -30,6 +30,14 @@ from src.ports.output.repositories.social_repository import (
 )
 from src.ports.output.repositories.taxonomy_repository import SeriesRepository, TagRepository
 from src.ports.output.repositories.user_repository import UserRepository
+from sqlalchemy import func as sa_func
+
+from src.application.use_cases.post import tech_stack as stack_service
+from src.domain.enums import PostStatus
+from src.infrastructure.database.models.post import Post
+from src.infrastructure.database.models.tech import PostStack
+from src.infrastructure.database.session import get_db
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -60,6 +68,10 @@ def _post_card(post) -> Dict[str, Any]:
         "tags": [link.tag.display_name for link in post.tags],
         "author": _author(post.user),
         "url": f"/@{post.user.handle}/{post.slug}",
+        # 목록에서도 낡은 글을 구분할 수 있어야 한다.
+        # 클릭한 뒤에야 알게 되면 독자의 시간을 이미 쓴 뒤다.
+        "stacks": stack_service.stacks_of(post),
+        "freshness": stack_service.freshness_of(post),
     }
 
 
@@ -204,6 +216,7 @@ def post_detail(
     follow_repo: FollowRepository = Depends(get_follow_repo),
     comment_repo: CommentRepository = Depends(get_comment_repo),
     series_repo: SeriesRepository = Depends(get_series_repo),
+    db: Session = Depends(get_db),
 ):
     post = post_repo.get_public(handle, slug)
     if not post:
@@ -244,6 +257,7 @@ def post_detail(
         "is_following_author": bool(viewer_id) and follow_repo.exists(viewer_id, post.user_id),
         "is_mine": viewer_id == post.user_id,
         "series": _series_nav(series_context, handle),
+        "signals": stack_service.signal_summary(db, post.id, viewer_id),
     }
 
 
@@ -330,3 +344,45 @@ def blog_rss_source(
             for p in posts
         ],
     }
+
+
+# ------------------------------------------------------------- 스택 탐색
+
+
+@router.get("/stacks")
+def popular_stacks(
+    limit: int = Query(40, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """많이 쓰인 스택. 태그와 달리 정규화되어 있어 집계가 의미를 갖는다."""
+    rows = (
+        db.query(PostStack.name, sa_func.count(sa_func.distinct(PostStack.post_id)))
+        .join(Post, Post.id == PostStack.post_id)
+        .filter(Post.status == PostStatus.PUBLISHED)
+        .group_by(PostStack.name)
+        .order_by(sa_func.count(sa_func.distinct(PostStack.post_id)).desc())
+        .limit(limit)
+        .all()
+    )
+    return [{"name": name, "post_count": count} for name, count in rows]
+
+
+@router.get("/stacks/{name}", response_model=PostList)
+def posts_by_stack(
+    name: str,
+    version: Optional[str] = Query(None, max_length=20),
+    # 기본값이 fresh_first 인 것이 이 제품의 입장이다.
+    # 최신순으로 정렬하면 "최근에 쓴 낡은 글" 이 위로 온다.
+    sort: str = Query("fresh_first", pattern="^(fresh_first|recent|trending)$"),
+    limit: int = Query(20, ge=1, le=MAX_PAGE_SIZE),
+    offset: int = Query(0, ge=0),
+    post_repo: PostRepository = Depends(get_post_repo),
+):
+    """이 스택으로 쓰인 글.
+
+    검색이나 태그와 다르다. "React 글" 이 아니라 "React 18 에서 확인된 글" 을 찾을 수 있다.
+    """
+    posts = post_repo.list_by_stack(
+        name.lower(), version=version, sort=sort, limit=limit + 1, offset=offset
+    )
+    return _paged(posts, limit)

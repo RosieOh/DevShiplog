@@ -15,10 +15,30 @@ const VIEWPORTS = [
   { name: '1440', width: 1440, height: 900, isMobile: false },
 ]
 const ROUTES = [
-  { path: '/', name: 'landing' },
+  { path: '/', name: 'feed' },
+  { path: '/about', name: 'about' },
   { path: '/auth/login', name: 'login' },
   { path: '/terms', name: 'terms' },
+  // 신선도 색(fresh/aging/stale)이 실제로 쓰이는 화면.
+  // 여기를 안 보면 새 색의 대비를 검사하지 않은 채로 넘어간다.
+  { path: '/stacks/react', name: 'stack' },
 ]
+
+/*
+ * 글 상세는 주소를 하드코딩할 수 없다. 환경마다 DB 가 다르고, 없는 주소를 넣으면
+ * 404 페이지를 검사하게 된다 (실제로 그렇게 엉뚱한 대비 오류를 봤다).
+ * 피드에서 하나 찾아 쓰고, 글이 없으면 건너뛴다.
+ */
+try {
+  const api = process.env.E2E_API || 'http://localhost:8001'
+  const feed = await (await fetch(`${api}/api/v1/public/feed?limit=1`)).json()
+  if (feed.items?.[0]?.url) ROUTES.push({ path: feed.items[0].url, name: 'post' })
+} catch {
+  console.error('글을 못 찾아 상세 페이지 검사를 건너뜁니다')
+}
+
+// 라이트/다크 양쪽을 본다. 한쪽만 맞추면 다른 쪽이 조용히 깨진다.
+const THEMES = ['light', 'dark']
 
 // sRGB 상대 휘도 → 대비비
 const lum = ([r, g, b]) => {
@@ -44,10 +64,13 @@ const findings = []
 
 for (const vp of VIEWPORTS) {
   for (const route of ROUTES) {
+   for (const theme of THEMES) {
     const page = await browser.newPage()
     await page.setViewport({ width: vp.width, height: vp.height, deviceScaleFactor: 1 })
-    await page.goto(`${BASE}${route.path}`, { waitUntil: 'networkidle2', timeout: 45000 })
-    await new Promise((r) => setTimeout(r, 600))
+    await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: theme }])
+    await page.goto(`${BASE}${route.path}`, { waitUntil: 'domcontentloaded', timeout: 45000 })
+    await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+    await new Promise((r) => setTimeout(r, 500))
 
     // 1) 가로 오버플로 (body overflow-x:hidden 을 제거했으므로 실제로 확인해야 한다)
     const overflow = await page.evaluate(() => {
@@ -68,7 +91,7 @@ for (const vp of VIEWPORTS) {
       }
       return { docW, winW, offenders: offenders.slice(0, 6) }
     })
-    if (overflow) findings.push({ type: 'overflow', vp: vp.name, route: route.name, ...overflow })
+    if (overflow) findings.push({ type: 'overflow', vp: vp.name, route: route.name, theme, ...overflow })
 
     // 2) 44px 미만 터치 타겟
     const smallTargets = await page.evaluate(() => {
@@ -88,7 +111,7 @@ for (const vp of VIEWPORTS) {
       return out.slice(0, 12)
     })
     if (smallTargets.length)
-      findings.push({ type: 'touch', vp: vp.name, route: route.name, items: smallTargets })
+      findings.push({ type: 'touch', vp: vp.name, route: route.name, theme, items: smallTargets })
 
     // 3) 텍스트 대비 (실제 계산된 색으로)
     const contrastSamples = await page.evaluate(() => {
@@ -128,7 +151,7 @@ for (const vp of VIEWPORTS) {
         findings.push({
           type: 'contrast',
           vp: vp.name,
-          route: route.name,
+          route: route.name, theme,
           text: s.text,
           ratio: cr.toFixed(2),
           need,
@@ -162,11 +185,12 @@ for (const vp of VIEWPORTS) {
         (f) => f && (f.outlineStyle === 'none' || parseFloat(f.outlineWidth) === 0)
       )
       if (noRing.length)
-        findings.push({ type: 'focus', vp: vp.name, route: route.name, items: noRing })
+        findings.push({ type: 'focus', vp: vp.name, route: route.name, theme, items: noRing })
     }
 
-    await page.screenshot({ path: `${OUT}${route.name}-${vp.name}.png`, fullPage: vp.name !== '1440' })
+    await page.screenshot({ path: `${OUT}${route.name}-${vp.name}-${theme}.png`, fullPage: vp.name !== '1440' })
     await page.close()
+   }
   }
 }
 
