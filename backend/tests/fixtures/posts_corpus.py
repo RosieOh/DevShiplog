@@ -455,3 +455,59 @@ const unique = <T,>(xs: T[]) => [...new Set(xs)]
 """,
     },
 ]
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# 실제 블로그 글에서 확인한 형태.
+#
+# 앞의 26건은 전부 내가 상상해서 쓴 것이고, 실제 글을 돌려보니 또 안 잡히는 게
+# 나왔다. 아래는 velog 에 실제로 올라온 글들에서 확인한 형태를 옮긴 것이다.
+#
+# **남의 글 본문을 그대로 넣지 않는다.** 저작물이고, 우리가 필요한 것은 문장이
+# 아니라 표기 형태다. 같은 형태를 우리 문장으로 다시 썼다.
+# ─────────────────────────────────────────────────────────────────────────
+
+CORPUS += [
+    {
+        # 확인처: Spring Boot 3.2.x 이슈 정리 글
+        # 여기서 "Spring Framework 6.1" 이 laravel 6.1 로 잡히는 오탐이 나왔다.
+        # composer 용으로 넣은 "framework" 별칭이 원인이었다.
+        "name": "실제 형태 · 두 단어 이름 + .x 표기 + 한글 이름",
+        "expect": {"spring-boot": "3.2", "spring": "6.1", "java": "17"},
+        "body": """Spring Boot 3.2.x 버전을 쓰며 겪은 일을 정리합니다.
+
+더 이상 지원하지 않는 Spring Boot 2.7.x 대신 3.2.x 를 골랐습니다.
+자바 17 버전으로 맞췄습니다. Spring Framework 6.1 의 변경점도 함께 봅니다.
+Java 8 이상이면 쓸 수 있는 옵션이지만, 이 글은 17 기준입니다.
+""",
+    },
+    {
+        # 확인처: Django + Docker 배포 글
+        # `image: redis` 처럼 태그 없는 이미지를 놓치고 있었다.
+        "name": "실제 형태 · 태그 없는 이미지",
+        "expect": {"python": "3.8", "docker": None, "redis": None, "django": None,
+                   "nginx": None, "gunicorn": None},
+        "body": """Django 를 컨테이너로 배포한 기록입니다. 앞단은 nginx, WSGI 는 gunicorn 입니다.
+
+```dockerfile
+FROM python:3.8-slim-buster
+WORKDIR /workdir
+```
+
+```yaml
+services:
+  cache:
+    image: redis
+    ports:
+      - 6379:6379
+```
+""",
+    },
+    {
+        # "Java 8 이상" 같은 최소 요구사항을 글의 전제로 잡으면 정반대가 된다.
+        "name": "실제 형태 · 최소 요구사항 언급",
+        "expect": {"nodejs": "20"},
+        "body": """Node 18 이상에서 동작하지만, 이 글은 Node 20 에서 확인했습니다.
+""",
+    },
+]
