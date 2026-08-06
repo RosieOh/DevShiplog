@@ -26,6 +26,9 @@ from src.ports.output.repositories.post_repository import PostRepository
 from src.ports.output.repositories.taxonomy_repository import TagRepository
 from src.infrastructure.external import revalidation
 from src.ports.output.repositories.user_repository import UserRepository
+from src.application.use_cases.post import tech_stack as stack_service
+from src.infrastructure.database.session import get_db
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -53,6 +56,9 @@ class PublishRequest(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     tags: List[str] = Field(default_factory=list, max_length=10)
     cover_url: Optional[str] = Field(default=None, max_length=1000)
+    # 이 글이 전제하는 기술과 버전. [{"name": "react", "version": "18.3"}]
+    # 생략하면 본문에서 자동 추출한 것을 그대로 쓴다.
+    stacks: Optional[List[Dict[str, Any]]] = Field(default=None, max_length=12)
     # 민감정보 경고를 확인하고도 진행하겠다는 명시적 동의
     allow_sensitive: bool = False
 
@@ -92,6 +98,7 @@ class PublishResponse(BaseModel):
     sensitive_findings: int
     # 호출자가 방금 올린 커버가 실제로 붙었는지 응답만 보고 확인할 수 있어야 한다.
     cover_url: Optional[str] = None
+    stacks: List[Dict[str, Any]] = []
 
 
 @router.post("", response_model=PublishResponse, status_code=status.HTTP_201_CREATED)
@@ -104,6 +111,7 @@ def publish(
     post_repo: PostRepository = Depends(get_post_repo),
     tag_repo: TagRepository = Depends(get_tag_repo),
     user_repo: UserRepository = Depends(get_user_repo),
+    db: Session = Depends(get_db),
 ):
     """작업본을 공개 발행한다. 같은 작업본을 다시 발행하면 주소를 유지한 채 갱신된다."""
     enforce_rate_limit("post_publish", client_identity(request, user_id))
@@ -117,6 +125,15 @@ def publish(
         cover_url=payload.cover_url,
         allow_sensitive=payload.allow_sensitive,
     )
+
+    # 기술 스택. 안 보내면 본문에서 뽑은 것을 그대로 쓴다 —
+    # 아무것도 없는 것보다는 추출본이 낫고, 작성자가 나중에 고칠 수 있다.
+    draft_version = draft_repo.get_latest_version(payload.draft_id)
+    stacks = payload.stacks
+    if stacks is None:
+        stacks = stack_service.suggest(draft_version.content_md if draft_version else "")
+    saved_stacks = stack_service.replace_stacks(db, result["id"], stacks)
+    result["stacks"] = [{"name": s.name, "version": s.version} for s in saved_stacks]
 
     # 공개 페이지 캐시를 깬다. 응답을 막지 않도록 백그라운드로 보낸다.
     user = user_repo.get_by_id(user_id)
@@ -222,3 +239,137 @@ def delete_post(
     )
     background.add_task(_cleanup_orphan, result.pop("orphan_cover_url", None))
     return result
+
+
+# ------------------------------------------------------- 기술 스택 · 검증
+
+
+class StackItem(BaseModel):
+    name: str = Field(max_length=40)
+    version: Optional[str] = Field(default=None, max_length=20)
+
+
+class SignalRequest(BaseModel):
+    kind: str  # works | broken
+    note: Optional[str] = Field(default=None, max_length=1000)
+
+
+@router.post("/stacks/suggest")
+def suggest_stacks(
+    payload: Dict[str, Any],
+    user_id: str = Depends(get_current_user_id),
+):
+    """본문에서 기술 스택 후보를 뽑는다.
+
+    발행 화면이 저장 전에 미리 보여주기 위한 것이라 글에 붙이지 않는다.
+    확정은 작성자가 발행할 때 한다 — 자동으로 확정하면 틀린 메타데이터가
+    조용히 퍼지고, 그건 없는 것보다 나쁘다.
+    """
+    return {"stacks": stack_service.suggest(str(payload.get("content_md", "")))}
+
+
+@router.put("/{post_id}/stacks")
+def update_stacks(
+    post_id: str,
+    stacks: List[StackItem],
+    background: BackgroundTasks,
+    user_id: str = Depends(get_current_user_id),
+    post_repo: PostRepository = Depends(get_post_repo),
+    user_repo: UserRepository = Depends(get_user_repo),
+    db: Session = Depends(get_db),
+):
+    """스택을 통째로 갈아끼운다."""
+    post = post_repo.get_by_id(post_id)
+    if not post or post.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="글을 찾을 수 없습니다.")
+
+    saved = stack_service.replace_stacks(db, post_id, [s.model_dump() for s in stacks])
+    user = user_repo.get_by_id(user_id)
+    background.add_task(
+        revalidation.notify, revalidation.tags_for_post(user.handle if user else None, post.slug)
+    )
+    return {"stacks": [{"name": s.name, "version": s.version} for s in saved]}
+
+
+@router.post("/{post_id}/verify")
+def verify_post(
+    post_id: str,
+    background: BackgroundTasks,
+    user_id: str = Depends(get_current_user_id),
+    post_repo: PostRepository = Depends(get_post_repo),
+    user_repo: UserRepository = Depends(get_user_repo),
+    db: Session = Depends(get_db),
+):
+    """"지금도 동작한다" 를 기록한다.
+
+    글을 고치지 않아도 누를 수 있다. 확인은 편집과 다른 행위이고,
+    "다시 돌려봤고 그대로 됐다" 는 것 자체가 독자에게 주는 정보다.
+    """
+    result = stack_service.mark_verified(db, post_id, user_id)
+
+    post = post_repo.get_by_id(post_id)
+    user = user_repo.get_by_id(user_id)
+    background.add_task(
+        revalidation.notify,
+        revalidation.tags_for_post(user.handle if user else None, post.slug if post else None),
+    )
+    return result
+
+
+@router.get("/needs-update")
+def posts_needing_update(
+    user_id: str = Depends(get_current_user_id),
+    post_repo: PostRepository = Depends(get_post_repo),
+    user_repo: UserRepository = Depends(get_user_repo),
+    db: Session = Depends(get_db),
+):
+    """갱신이 필요한 내 글.
+
+    "낡은 글이 있다" 만으로는 아무도 안 고친다. 무엇부터 고쳐야 하는지가 있어야 한다.
+    그래서 신호 수와 조회수로 정렬한다 — 안 읽히는 낡은 글은 급하지 않다.
+    """
+    user = user_repo.get_by_id(user_id)
+    posts = post_repo.list_by_user(user_id, only_published=True, limit=200, offset=0)
+
+    items = []
+    for post in posts:
+        freshness = stack_service.freshness_of(post)
+        signals = stack_service.signal_summary(db, post.id)
+        unresolved_broken = signals["broken"] > 0
+        if freshness["level"] in ("fresh",) and not unresolved_broken:
+            continue
+        items.append(
+            {
+                "id": post.id,
+                "title": post.title,
+                "url": f"/@{user.handle}/{post.slug}" if user and user.handle else None,
+                "view_count": post.view_count,
+                "freshness": freshness,
+                "stacks": stack_service.stacks_of(post),
+                "signals": signals,
+            }
+        )
+
+    # 안 읽히는 낡은 글보다, 읽히는데 안 되는 글이 급하다.
+    severity = {"stale": 0, "aging": 1, "unverified": 2, "fresh": 3}
+    items.sort(
+        key=lambda i: (
+            0 if i["signals"]["broken"] else 1,
+            severity.get(i["freshness"]["level"], 9),
+            -i["view_count"],
+        )
+    )
+    return {"items": items}
+
+
+@router.post("/{post_id}/signal")
+def send_signal(
+    post_id: str,
+    request: Request,
+    payload: SignalRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """독자가 "따라 해봤다" 를 알린다."""
+    enforce_rate_limit("signal", client_identity(request, user_id))
+    return stack_service.send_signal(db, post_id, user_id, payload.kind, payload.note)
