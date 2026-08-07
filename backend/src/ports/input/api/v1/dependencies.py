@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from src.domain.enums import UserRole
 from src.infrastructure.auth.jwt_handler import decode_access_token
 from src.infrastructure.config.settings import settings
 from src.infrastructure.database.repositories.draft_repository_impl import DraftRepositoryImpl
@@ -221,3 +222,18 @@ def viewer_key(request: Request, user_id: Optional[str] = None) -> str:
 
     raw = f"{_client_ip(request)}|{request.headers.get('user-agent', '')}"
     return hmac.new(settings.SECRET_KEY.encode(), raw.encode(), hashlib.sha256).hexdigest()
+
+
+def get_admin_user_id(
+    user_id: str = Depends(get_current_user_id),
+    user_repo: UserRepositoryImpl = Depends(get_user_repo),
+) -> str:
+    """운영자만 통과시킨다.
+
+    권한 없음을 404 로 답한다. 403 을 내면 "그런 화면이 있긴 하다" 를 알려주게 되고,
+    운영자 화면의 존재를 굳이 광고할 이유가 없다.
+    """
+    user = user_repo.get_by_id(user_id)
+    if not user or user.role is not UserRole.ADMIN:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="찾을 수 없습니다.")
+    return user_id
