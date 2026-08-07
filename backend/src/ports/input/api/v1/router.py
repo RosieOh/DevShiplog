@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from src.ports.input.api.v1 import (
+    admin,
     analytics,
     auth,
     drafts,
@@ -49,3 +50,7 @@ api_router.include_router(series.router, prefix="/series", tags=["series"])
 api_router.include_router(templates.router, prefix="/templates", tags=["templates"])
 api_router.include_router(schedules.router, prefix="/schedules", tags=["schedules"])
 api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
+
+# --- 운영 -----------------------------------------------------------------
+# 신고를 처리할 사람이 없으면 신고 기능은 장식이다.
+api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
