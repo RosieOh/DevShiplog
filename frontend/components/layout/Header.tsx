@@ -186,10 +186,10 @@ export default function Header() {
           {isAdmin && (
             <li className="border-t border-border-subtle">
               <Link
-                href="/admin/reports"
+                href="/admin"
                 className="flex min-h-touch items-center px-4 text-sm font-medium text-ink hover:bg-surface-2"
               >
-                신고 처리
+                운영
               </Link>
             </li>
           )}
