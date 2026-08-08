@@ -179,20 +179,36 @@ def test_json_log_without_context_omits_fields():
 
 
 def test_readiness_reports_each_dependency(client):
-    """`{"status":"healthy"}` 만으로는 DB 가 끊겨도 healthy 라고 답한다."""
+    """`{"status":"healthy"}` 만으로는 DB 가 끊겨도 healthy 라고 답한다.
+
+    실제로 붙는지(ok)는 여기서 단정하지 않는다.
+    준비 상태 점검은 테스트용 인메모리 SQLite 가 아니라 **앱이 진짜로 쓸 DB** 를 두드린다.
+    그게 맞는 동작이다 — 테스트 세션을 보고 "준비됐다" 고 답하면 점검이 아니다.
+    대신 그래서 이 값은 환경에 따라 달라지므로, 여기서는 구조와 필수 여부만 본다.
+    붙었을 때/끊겼을 때의 응답은 아래 두 테스트가 각각 확인한다.
+    """
+    body = client.get("/health/ready").json()
+    checks = {check["name"]: check for check in body["checks"]}
+    assert set(checks) == {"database", "redis", "storage"}
+    assert checks["database"]["required"] is True
+
+    # Redis 가 끊겨도 글 읽기·쓰기는 된다. 필수로 두면 Redis 재시작에
+    # 서비스 전체가 트래픽에서 빠진다 — 실제로는 조금 불편해질 뿐인데.
+    assert checks["redis"]["required"] is False
+
+    # 응답 코드는 판정을 따라가야 한다. 둘이 어긋나면 로드밸런서가 엉뚱하게 움직인다.
+    assert client.get("/health/ready").status_code == (200 if body["ready"] else 503)
+
+
+def test_readiness_returns_200_when_required_dependencies_are_up(client, monkeypatch):
+    """필수 의존성이 살아 있으면 트래픽을 받아야 한다."""
+    import src.infrastructure.observability.health as health
+
+    monkeypatch.setattr(health, "_check_database", lambda: None)
+    monkeypatch.setattr(health, "_check_storage", lambda: None)
     response = client.get("/health/ready")
-    body = response.json()
-    names = {check["name"] for check in body["checks"]}
-    assert names == {"database", "redis", "storage"}
-
-    database = next(c for c in body["checks"] if c["name"] == "database")
-    assert database["ok"] is True and database["required"] is True
-
-    # Redis 가 없는 환경에서도 DB 만 살아 있으면 준비된 것으로 본다.
-    # Redis 를 required 로 두면 Redis 재시작에 서비스 전체가 트래픽에서 빠진다.
-    redis_check = next(c for c in body["checks"] if c["name"] == "redis")
-    assert redis_check["required"] is False
     assert response.status_code == 200
+    assert response.json()["ready"] is True
 
 
 def test_readiness_returns_503_when_required_dependency_is_down(client, monkeypatch):
