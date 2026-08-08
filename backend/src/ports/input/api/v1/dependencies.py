@@ -7,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from src.domain.enums import UserRole
+from src.infrastructure.observability.context import user_id_var
 from src.infrastructure.auth.jwt_handler import decode_access_token
 from src.infrastructure.config.settings import settings
 from src.infrastructure.database.repositories.draft_repository_impl import DraftRepositoryImpl
@@ -60,6 +61,9 @@ def _user_id_from_token(token: Optional[str]) -> str:
     user_id = payload.get("sub")
     if not user_id or not isinstance(user_id, str):
         raise CREDENTIALS_EXCEPTION
+    # 로그에 누구의 요청인지 남긴다. 오류를 재현하려면 "어떤 상태의 사용자인가" 가 필요하고,
+    # 요청 ID 만으로는 거기까지 못 간다.
+    user_id_var.set(user_id)
     return user_id
 
 

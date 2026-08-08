@@ -83,6 +83,16 @@ class Settings(BaseSettings):
     # App
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
+    # 로그와 오류 화면에 같이 실린다. "어느 버전에서 난 오류인가" 를 알 수 없으면
+    # 배포 직후 생긴 오류인지 원래 있던 것인지 구분할 방법이 없다.
+    APP_VERSION: str = "0.1.0"
+
+    # Observability
+    # 배포에서는 JSON 이 기본이어야 검색이 된다. 개발에서는 사람이 읽는 형식.
+    LOG_JSON: bool = False
+    # 비어 있으면 프로세스 내 수집기만 쓴다. 외부 서비스 가입을 전제로 하면
+    # 결국 아무것도 안 붙이고 넘어가게 된다.
+    SENTRY_DSN: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",

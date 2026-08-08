@@ -9,12 +9,17 @@ from fastapi.staticfiles import StaticFiles
 
 from src.application.errors import ApplicationError, StaleDraftError
 from src.infrastructure.config.settings import settings
+from src.infrastructure.observability.context import current_request_id, request_id_var
+from src.infrastructure.observability.errors import error_tracker, init_error_tracking
+from src.infrastructure.observability.health import readiness
+from src.infrastructure.observability.logging_setup import configure_logging
+from src.infrastructure.observability.middleware import RequestContextMiddleware
 from src.ports.input.api.v1.router import api_router
 
-logging.basicConfig(
-    level=logging.DEBUG if settings.DEBUG else logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-)
+# 배포에서는 JSON, 개발에서는 사람이 읽는 형식.
+# 개발자에게 JSON 을 읽히면 로그를 안 보게 되고, 안 보는 로그는 없는 것과 같다.
+configure_logging(json_output=settings.LOG_JSON, debug=settings.DEBUG)
+init_error_tracking(settings.SENTRY_DSN, settings.ENVIRONMENT, settings.APP_VERSION)
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
@@ -50,6 +55,10 @@ app = FastAPI(
     openapi_url=None if settings.is_production else "/openapi.json",
 )
 
+# CORS 보다 뒤에 등록한다 — Starlette 는 나중에 등록한 미들웨어가 바깥에 놓이므로,
+# 이 순서라야 CORS 프리플라이트까지 요청 ID 를 달고 로그에 남는다.
+app.add_middleware(RequestContextMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -73,10 +82,35 @@ async def application_error_handler(request: Request, exc: ApplicationError):
 
 @app.exception_handler(Exception)
 async def unhandled_error_handler(request: Request, exc: Exception):
-    """예상치 못한 예외에서 스택트레이스가 클라이언트로 새어나가지 않도록 한다."""
-    logger.exception("처리되지 않은 오류: %s %s", request.method, request.url.path)
+    """예상치 못한 예외에서 스택트레이스가 클라이언트로 새어나가지 않도록 한다.
+
+    로그만 남기면 아무도 안 본다. 여기서 수집기에도 넣어야 운영자 화면에 뜬다.
+    응답에 지문을 실어 주는 이유: 사용자가 "오류가 났어요" 라고만 말하면
+    로그에서 그 요청을 찾을 방법이 없다.
+    """
+    # 미들웨어가 심어 둔 값을 먼저 본다 — 여기는 미들웨어 바깥이라 ContextVar 는 비어 있다.
+    request_id = getattr(request.state, "request_id", None) or current_request_id()
+    fingerprint = error_tracker.capture(
+        exc, path=request.url.path, method=request.method, request_id=request_id
+    )
+    # 로그 줄에도 요청 ID 가 붙어야 앞뒤 로그와 이어진다. 위와 같은 이유로 직접 넣는다.
+    token = request_id_var.set(request_id)
+    try:
+        logger.exception(
+            "처리되지 않은 오류: %s %s",
+            request.method,
+            request.url.path,
+            extra={"fingerprint": fingerprint},
+        )
+    finally:
+        request_id_var.reset(token)
     return JSONResponse(
-        status_code=500, content={"detail": "서버 오류가 발생했습니다."}
+        status_code=500,
+        content={
+            "detail": "서버 오류가 발생했습니다.",
+            "request_id": request_id,
+            "error_id": fingerprint,
+        },
     )
 
 
@@ -105,7 +139,19 @@ def root():
 
 @app.get("/health")
 def health():
-    return {"status": "healthy"}
+    """살아있는가. 재시작 판단용이라 아무것도 두드리지 않는다."""
+    return {"status": "healthy", "version": settings.APP_VERSION}
+
+
+@app.get("/health/ready")
+def health_ready():
+    """요청을 처리할 수 있는가. 트래픽 투입 판단용.
+
+    준비되지 않았으면 503 을 낸다. 200 으로 답하면 로드밸런서가
+    DB 가 끊긴 인스턴스로 트래픽을 계속 보낸다.
+    """
+    result = readiness()
+    return JSONResponse(status_code=200 if result["ready"] else 503, content=result)
 
 
 if __name__ == "__main__":
