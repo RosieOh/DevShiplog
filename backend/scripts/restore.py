@@ -141,7 +141,10 @@ def load_dump(
     assert process.stdin is not None
     with gzip.open(dump, "rb") as handle:
         shutil.copyfileobj(handle, process.stdin, length=1 << 20)
-    process.stdin.close()
+
+    # stdin 을 여기서 닫지 않는다. communicate() 가 직접 flush 하고 닫는데,
+    # 이미 닫혀 있으면 POSIX 에서 "ValueError: flush of closed file" 로 죽는다.
+    # Windows 는 구현이 달라 그냥 넘어가서, 로컬에서는 멀쩡하고 CI 에서만 터졌다.
     _, err = process.communicate()
     if process.returncode != 0:
         message = err.decode(errors="replace").strip()
