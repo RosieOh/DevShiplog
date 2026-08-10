@@ -94,6 +94,14 @@ class Settings(BaseSettings):
     # 결국 아무것도 안 붙이고 넘어가게 된다.
     SENTRY_DSN: str = ""
 
+    # 알림. 오류가 화면에 쌓여도 아무도 안 보면 모르는 것과 같다.
+    # 둘 다 비어 있으면 로그만 남긴다.
+    ALERT_EMAIL: str = ""
+    ALERT_WEBHOOK_URL: str = ""  # Slack/Discord Incoming Webhook
+    # 같은 오류로 알림이 쏟아지면 사람은 알림을 끈다. 끈 알림은 없느니만 못하다.
+    ALERT_ERROR_WINDOW_MINUTES: int = 60
+    ALERT_REPORT_WINDOW_MINUTES: int = 30
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,

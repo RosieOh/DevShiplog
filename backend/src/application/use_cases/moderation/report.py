@@ -4,6 +4,7 @@
 자동으로 가려서, 운영자가 없는 시간대에 피해가 누적되지 않게 한다.
 """
 
+import logging
 from typing import Any, Dict
 
 from src.application.errors import NotFoundError, ValidationError
@@ -12,6 +13,8 @@ from src.ports.output.repositories.moderation_repository import BlockRepository,
 from src.ports.output.repositories.post_repository import PostRepository
 from src.ports.output.repositories.social_repository import CommentRepository
 from src.ports.output.repositories.user_repository import UserRepository
+
+logger = logging.getLogger(__name__)
 
 # 서로 다른 사용자에게서 이만큼 신고가 쌓이면 검토 전까지 자동으로 가린다.
 AUTO_HIDE_THRESHOLD = 5
@@ -57,6 +60,22 @@ class ReportContentUseCase:
         open_count = self.report_repo.count_open_for_target(ttype, target_id)
         if open_count >= AUTO_HIDE_THRESHOLD:
             auto_hidden = self._auto_hide(ttype, target_id)
+
+        # 운영자에게 알린다. 신고 화면을 만들어도 들여다볼 이유가 생기지 않으면
+        # 결국 아무도 안 보고, 그러면 화면이 있으나 마나다.
+        #
+        # 알림 자체가 실패해도 신고는 이미 접수됐다. 신고자에게 오류를 보여주면
+        # 다시 신고하게 되고, 그건 큐만 부풀린다.
+        try:
+            from src.infrastructure.observability import alerts
+
+            alerts.new_report(
+                reason=treason.value,
+                target_type=ttype.value,
+                pending=len(self.report_repo.list_open(limit=100, offset=0)),
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("신고 알림 실패", exc_info=True)
 
         return {"reported": True, "already": False, "auto_hidden": auto_hidden}
 

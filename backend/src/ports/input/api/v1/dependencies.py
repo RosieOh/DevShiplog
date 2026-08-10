@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import Depends, HTTPException, Query, Request, status
@@ -67,11 +68,57 @@ def _user_id_from_token(token: Optional[str]) -> str:
     return user_id
 
 
+# 읽기만 하는 메서드. 정지된 사용자도 자기 글과 정지 사유는 볼 수 있어야 한다.
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
 def get_current_user_id(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: Session = Depends(get_db),
 ) -> str:
-    """Authorization: Bearer <token> 에서 사용자 ID 를 얻는다."""
-    return _user_id_from_token(credentials.credentials if credentials else None)
+    """Authorization: Bearer <token> 에서 사용자 ID 를 얻는다.
+
+    쓰기 요청이면 정지 여부까지 본다. 한 군데에서 막는 이유:
+    엔드포인트마다 검사를 붙이면 새로 만드는 엔드포인트에서 빠뜨리고,
+    빠뜨린 자리가 곧 구멍이 된다.
+
+    읽기는 막지 않는다. 정지된 사람도 자기 글과 정지 사유는 볼 수 있어야 하고,
+    안 그러면 무슨 일이 일어났는지 알 방법이 없다.
+    """
+    user_id = _user_id_from_token(credentials.credentials if credentials else None)
+    if request.method not in _SAFE_METHODS:
+        _reject_if_suspended(db, user_id)
+    return user_id
+
+
+def _reject_if_suspended(db: Session, user_id: str) -> None:
+    from src.infrastructure.database.models.user import User
+
+    row = (
+        db.query(User.suspended_until, User.suspend_reason)
+        .filter(User.id == user_id)
+        .first()
+    )
+    if not row or row[0] is None:
+        return
+
+    until, reason = row
+    # DB 는 시간대 없는 UTC 로 저장한다. 붙여 주지 않으면 비교가 어긋난다.
+    until_utc = until if until.tzinfo else until.replace(tzinfo=timezone.utc)
+    if until_utc <= datetime.now(timezone.utc):
+        # 기한이 지났으면 정지는 저절로 풀린다. 운영자가 해제를 잊어도
+        # 사용자가 무기한 갇히지 않는다.
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail={
+            "message": "계정이 일시 정지되어 글을 쓰거나 반응할 수 없습니다.",
+            "suspended_until": until_utc.isoformat(),
+            "reason": reason or "",
+        },
+    )
 
 
 def get_current_user_id_sse(

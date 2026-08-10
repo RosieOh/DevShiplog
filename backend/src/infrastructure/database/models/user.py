@@ -46,6 +46,14 @@ class User(Base):
     # 별도 테이블로 빼지 않는다 — 역할이 둘뿐이고 사용자당 하나다.
     role = Column(Enum(UserRole), nullable=False, default=UserRole.USER, server_default="USER")
 
+    # 정지 만료 시각. NULL 이면 정상.
+    #
+    # 영구 정지를 넣지 않은 이유: 되돌릴 수 없는 조치는 오판했을 때 고칠 방법이 없고,
+    # 오판은 한다. 기한을 두면 최악의 경우에도 시간이 해결한다. 필요하면 다시 걸면 된다.
+    suspended_until = Column(DateTime, nullable=True)
+    # 본인에게 보여줄 사유. 이유를 모르는 정지는 항의만 부르고 행동을 바꾸지 않는다.
+    suspend_reason = Column(String(300), nullable=True)
+
     templates = relationship("Template", back_populates="user", cascade="all, delete-orphan")
     schedules = relationship("Schedule", back_populates="user", cascade="all, delete-orphan")
 
