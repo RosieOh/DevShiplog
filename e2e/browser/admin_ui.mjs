@@ -48,7 +48,11 @@ try {
     page.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {}),
     page.click('button[type="submit"]'),
   ])
-  await new Promise((r) => setTimeout(r, 2500))
+  // 고정 대기는 dev 서버가 라우트를 처음 컴파일할 때 부족하다.
+  // 조건이 될 때까지 기다린다 — 못 기다려서 나는 실패는 진짜 실패를 가린다.
+  for (let i = 0; i < 30 && page.url().includes('/auth/login'); i += 1) {
+    await new Promise((r) => setTimeout(r, 500))
+  }
   check('운영자 로그인', !page.url().includes('/auth/login'), page.url())
 
   // --- 개요 ---------------------------------------------------------------
@@ -62,9 +66,14 @@ try {
     overview.includes('데이터베이스') && overview.includes('Redis'),
   )
   check(
-    '수집기 한계를 숨기지 않는다',
-    overview.includes('재시작하면 사라지고'),
-    '한계를 안 적으면 모르고 믿게 된다',
+    '알림이 꺼져 있으면 알려준다',
+    overview.includes('알림 통로가 설정돼 있지 않습니다'),
+    '안 그러면 "오류가 나면 연락이 오겠지" 라고 믿은 채로 아무 연락도 안 온다',
+  )
+  check(
+    '정지 중인 사용자가 보인다',
+    overview.includes('정지 중인 사용자') && overview.includes('해제'),
+    '걸어 놓고 잊는 것을 막는다',
   )
   await page.screenshot({ path: `${OUT}admin-overview.png`, fullPage: true })
 
@@ -78,7 +87,15 @@ try {
     reports.includes('원문 보기') && /운영 화면 확인용 글/.test(reports),
     '다시 찾아 들어가야 하면 처리가 느려진다',
   )
-  check('처리 버튼이 모두 있다', ['문제 없음', '조치함', '글 내리기'].every((t) => reports.includes(t)))
+  check(
+    '처리 버튼이 모두 있다',
+    ['문제 없음', '조치함', '글 내리기', '글 내리고 7일 정지'].every((t) => reports.includes(t)),
+  )
+  check(
+    '정지가 되돌릴 수 있음을 알려준다',
+    reports.includes('기한이 지나면 저절로 풀립니다'),
+    '되돌릴 수 없어 보이면 운영자가 아예 안 쓴다',
+  )
   await page.screenshot({ path: `${OUT}admin-reports.png`, fullPage: true })
 
   // 실제로 처리해 본다. 버튼이 있는 것과 눌러서 사라지는 것은 다른 문제다.

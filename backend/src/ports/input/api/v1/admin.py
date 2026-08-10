@@ -4,15 +4,19 @@
 공개 서비스로 열기 전에 반드시 있어야 한다.
 """
 
-from datetime import timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from src.application.errors import NotFoundError, ValidationError
-from src.domain.enums import PostStatus, ReportStatus
-from src.infrastructure.observability.errors import error_tracker
+from sqlalchemy.orm import Session
+
+from src.domain.enums import PostStatus, ReportStatus, UserRole
+from src.infrastructure.config.settings import settings
+from src.infrastructure.database.session import get_db
+from src.infrastructure.observability import errors as error_store
 from src.infrastructure.observability.health import readiness
 from src.ports.input.api.v1.dependencies import (
     get_admin_user_id,
@@ -30,9 +34,12 @@ router = APIRouter()
 class ResolveRequest(BaseModel):
     # resolved = 신고가 타당했다, rejected = 문제 없었다
     status: str = Field(pattern="^(resolved|rejected)$")
-    # 신고가 타당하면 글을 내린다. 사용자 정지는 아직 없다 —
-    # 그건 되돌리기가 훨씬 어렵고, 지금 규모에서 필요하지 않다.
+    # 신고가 타당하면 글을 내린다.
     unpublish_post: bool = False
+    # 반복되는 경우 작성자를 일정 기간 정지한다. 0 이면 정지하지 않는다.
+    # 한 화면에서 끝내야 한다 — 신고를 처리하고 다시 사용자를 찾아 들어가야 하면
+    # 그 단계에서 그만두게 된다.
+    suspend_author_days: int = Field(default=0, ge=0, le=365)
 
 
 def _iso_utc(value) -> Optional[str]:
@@ -105,6 +112,8 @@ def resolve_report(
     _: str = Depends(get_admin_user_id),
     report_repo: ReportRepository = Depends(get_report_repo),
     post_repo: PostRepository = Depends(get_post_repo),
+    user_repo: UserRepository = Depends(get_user_repo),
+    db: Session = Depends(get_db),
 ):
     """신고를 처리한다."""
     try:
@@ -120,19 +129,129 @@ def resolve_report(
         raise NotFoundError("신고를 찾을 수 없습니다.") from exc
 
     unpublished = False
-    if payload.unpublish_post and report.target_type.value == "post":
+    author = None
+    if report.target_type.value == "post":
         post = post_repo.get_by_id(report.target_id)
-        if post and post.status is PostStatus.PUBLISHED:
-            post_repo.set_status(post.id, PostStatus.UNLISTED)
-            unpublished = True
+        if post:
+            author = post.user
+            if payload.unpublish_post and post.status is PostStatus.PUBLISHED:
+                post_repo.set_status(post.id, PostStatus.UNLISTED)
+                unpublished = True
+    elif report.target_type.value == "user":
+        author = user_repo.get_by_id(report.target_id)
 
-    return {"status": report.status.value, "unpublished": unpublished}
+    suspended_until = None
+    if payload.suspend_author_days and author and author.role is not UserRole.ADMIN:
+        until = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
+            days=payload.suspend_author_days
+        )
+        author.suspended_until = until
+        author.suspend_reason = f"신고 처리 ({report.reason.value})"
+        db.commit()
+        suspended_until = _iso_utc(until)
+
+    return {
+        "status": report.status.value,
+        "unpublished": unpublished,
+        "suspended_until": suspended_until,
+    }
+
+
+class SuspendRequest(BaseModel):
+    # 기한제만 둔다. 영구 정지는 오판했을 때 고칠 방법이 없고, 오판은 한다.
+    # 필요하면 다시 걸면 된다.
+    days: int = Field(ge=1, le=365)
+    reason: str = Field(default="", max_length=300)
+
+
+@router.post("/users/{handle}/suspend")
+def suspend_user(
+    handle: str,
+    payload: SuspendRequest,
+    admin_id: str = Depends(get_admin_user_id),
+    user_repo: UserRepository = Depends(get_user_repo),
+    db: Session = Depends(get_db),
+):
+    """일정 기간 쓰기를 막는다. 읽기는 막지 않는다.
+
+    정지된 사람도 자기 글과 정지 사유는 볼 수 있어야 한다 —
+    안 그러면 무슨 일이 일어났는지 알 방법이 없고, 그건 처벌이 아니라 방치다.
+    """
+    user = user_repo.get_by_handle(handle)
+    if not user:
+        raise NotFoundError("사용자를 찾을 수 없습니다.")
+    if user.id == admin_id:
+        # 자기 발등을 찍으면 풀어 줄 사람이 없다.
+        raise ValidationError("자기 자신은 정지할 수 없습니다.")
+    if user.role is UserRole.ADMIN:
+        raise ValidationError("운영자는 정지할 수 없습니다. 먼저 권한을 회수하세요.")
+
+    until = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=payload.days)
+    user.suspended_until = until
+    user.suspend_reason = payload.reason or None
+    db.commit()
+
+    return {
+        "handle": user.handle,
+        "suspended_until": _iso_utc(until),
+        "reason": user.suspend_reason or "",
+    }
+
+
+@router.post("/users/{handle}/unsuspend")
+def unsuspend_user(
+    handle: str,
+    _: str = Depends(get_admin_user_id),
+    user_repo: UserRepository = Depends(get_user_repo),
+    db: Session = Depends(get_db),
+):
+    """정지 해제. 오판이었다면 바로 되돌릴 수 있어야 한다."""
+    user = user_repo.get_by_handle(handle)
+    if not user:
+        raise NotFoundError("사용자를 찾을 수 없습니다.")
+    user.suspended_until = None
+    user.suspend_reason = None
+    db.commit()
+    return {"handle": user.handle, "suspended_until": None}
+
+
+@router.get("/users/suspended")
+def suspended_users(
+    _: str = Depends(get_admin_user_id),
+    db: Session = Depends(get_db),
+):
+    """지금 정지 중인 사람.
+
+    걸어 놓고 잊는 것을 막는다. 기한이 지난 것은 저절로 풀리므로 보여주지 않는다.
+    """
+    from src.infrastructure.database.models.user import User
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    rows = (
+        db.query(User)
+        .filter(User.suspended_until.isnot(None), User.suspended_until > now)
+        .order_by(User.suspended_until.asc())
+        .limit(100)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "handle": user.handle,
+                "display_name": user.display_name,
+                "suspended_until": _iso_utc(user.suspended_until),
+                "reason": user.suspend_reason or "",
+            }
+            for user in rows
+        ]
+    }
 
 
 @router.get("/summary")
 def admin_summary(
     _: str = Depends(get_admin_user_id),
     report_repo: ReportRepository = Depends(get_report_repo),
+    db: Session = Depends(get_db),
 ):
     """운영자가 첫 화면에서 볼 것.
 
@@ -140,32 +259,39 @@ def admin_summary(
     "지금 손댈 일이 있는가" 가 한눈에 보이는 게 먼저다.
     """
     pending = report_repo.list_open(limit=100, offset=0)
-    return {
-        "pending_reports": len(pending),
-        "error_groups": len(error_tracker.recent(limit=100)),
-        "error_events": error_tracker.total(),
-    }
+    return {"pending_reports": len(pending), **error_store.stored_summary(db)}
 
 
 @router.get("/errors")
 def recent_errors(
     limit: int = Query(20, ge=1, le=50),
+    include_resolved: bool = Query(False),
     _: str = Depends(get_admin_user_id),
+    db: Session = Depends(get_db),
 ):
     """최근 서버 오류.
 
-    한계를 함께 실어 보낸다 — 이 목록은 이 프로세스의 메모리에만 있다.
-    재시작하면 사라지고, 워커가 여럿이면 응답이 닿은 워커의 것만 보인다.
-    모르고 믿는 게 없는 것보다 나쁘다.
+    DB 에서 읽는다. 예전에는 프로세스 메모리에만 있어서 재시작하면 사라지고
+    워커가 여럿이면 일부만 보였다 — "어제 밤에 뭐가 터졌지" 를 물을 수 없었다.
     """
+    items = error_store.stored_recent(db, limit=limit, include_resolved=include_resolved)
     return {
-        "items": error_tracker.recent(limit=limit),
-        "total_events": error_tracker.total(),
-        "note": (
-            "이 프로세스의 메모리에만 남습니다. 재시작하면 사라지고, "
-            "워커가 여럿이면 일부만 보입니다. 영구 보관은 SENTRY_DSN 을 설정하세요."
-        ),
+        "items": items,
+        **error_store.stored_summary(db),
+        "alerting": bool(settings.ALERT_EMAIL or settings.ALERT_WEBHOOK_URL),
     }
+
+
+@router.post("/errors/{fingerprint}/resolve")
+def resolve_error(
+    fingerprint: str,
+    _: str = Depends(get_admin_user_id),
+    db: Session = Depends(get_db),
+):
+    """확인 처리. 지우지 않는다 — 다시 나면 목록에 되돌아와야 재발을 안다."""
+    if not error_store.mark_resolved(db, fingerprint):
+        raise NotFoundError("그런 오류 기록이 없습니다.")
+    return {"resolved": True}
 
 
 @router.get("/readiness")
