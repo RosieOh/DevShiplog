@@ -224,10 +224,16 @@ def test_readiness_returns_503_when_required_dependency_is_down(client, monkeypa
     assert response.json()["ready"] is False
 
 
-def test_admin_can_see_errors_and_readiness(client, db_session, auth_headers, boom_client):
+def test_admin_can_see_errors_and_readiness(
+    client, db_session, auth_headers, boom_client, monkeypatch
+):
     from src.infrastructure.observability.errors import error_tracker
 
     error_tracker.reset()
+    # 화면은 이제 DB 를 읽는다. 테스트 세션을 쓰도록 붙여 준다.
+    monkeypatch.setattr("src.infrastructure.observability.errors.session_factory",
+                        lambda: db_session)
+    monkeypatch.setattr(db_session, "close", lambda: None)
     boom_client.get("/__boom")
 
     user_id = client.get("/api/v1/auth/me", headers=auth_headers).json()["id"]
@@ -237,7 +243,9 @@ def test_admin_can_see_errors_and_readiness(client, db_session, auth_headers, bo
 
     errors = client.get("/api/v1/admin/errors", headers=auth_headers).json()
     assert errors["items"][0]["type"] == "RuntimeError"
-    # 한계를 화면에도 적어 둔다. 모르고 믿는 게 없는 것보다 나쁘다.
-    assert "재시작" in errors["note"]
+    assert errors["error_groups"] == 1
+    # 알림 통로가 설정돼 있는지 화면이 알아야 한다.
+    # 안 그러면 "오류가 나면 연락이 오겠지" 라고 믿은 채로 아무 연락도 안 온다.
+    assert errors["alerting"] is False
 
     assert client.get("/api/v1/admin/readiness", headers=auth_headers).json()["checks"]

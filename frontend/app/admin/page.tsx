@@ -19,6 +19,13 @@ interface Summary {
   error_events: number
 }
 
+interface Suspended {
+  handle: string
+  display_name: string | null
+  suspended_until: string
+  reason: string
+}
+
 interface ErrorGroup {
   fingerprint: string
   type: string
@@ -30,6 +37,7 @@ interface ErrorGroup {
   first_seen: string
   last_seen: string
   last_request_id: string | null
+  resolved_at: string | null
   traceback: string
 }
 
@@ -59,7 +67,8 @@ export default function AdminPage() {
   const { status } = useSession()
   const router = useRouter()
   const [summary, setSummary] = useState<Summary | null>(null)
-  const [errors, setErrors] = useState<{ items: ErrorGroup[]; note: string } | null>(null)
+  const [errors, setErrors] = useState<{ items: ErrorGroup[]; alerting: boolean } | null>(null)
+  const [suspended, setSuspended] = useState<Suspended[]>([])
   const [checks, setChecks] = useState<Check[] | null>(null)
   const [denied, setDenied] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
@@ -72,17 +81,33 @@ export default function AdminPage() {
     }
     Promise.all([
       apiClient.get<Summary>('/api/v1/admin/summary'),
-      apiClient.get<{ items: ErrorGroup[]; note: string }>('/api/v1/admin/errors'),
+      apiClient.get<{ items: ErrorGroup[]; alerting: boolean }>('/api/v1/admin/errors'),
       apiClient.get<{ checks: Check[] }>('/api/v1/admin/readiness'),
+      apiClient.get<{ items: Suspended[] }>('/api/v1/admin/users/suspended'),
     ])
-      .then(([s, e, r]) => {
+      .then(([s, e, r, u]) => {
         setSummary(s)
         setErrors(e)
         setChecks(r.checks)
+        setSuspended(u.items)
       })
       // 서버는 권한 없음을 404 로 답한다. 화면의 존재를 광고하지 않기 위해서다.
       .catch(() => setDenied(true))
   }, [status, router])
+
+  async function resolveError(fingerprint: string) {
+    await apiClient.post(`/api/v1/admin/errors/${fingerprint}/resolve`, {})
+    // 목록에서 바로 뺀다. 다시 불러오면 위치가 흔들려 방금 무엇을 처리했는지 알기 어렵다.
+    setErrors((prev) =>
+      prev ? { ...prev, items: prev.items.filter((e) => e.fingerprint !== fingerprint) } : prev
+    )
+    setSummary((prev) => (prev ? { ...prev, error_groups: prev.error_groups - 1 } : prev))
+  }
+
+  async function unsuspend(handle: string) {
+    await apiClient.post(`/api/v1/admin/users/${handle}/unsuspend`, {})
+    setSuspended((prev) => prev.filter((u) => u.handle !== handle))
+  }
 
   if (denied) {
     return (
@@ -159,6 +184,35 @@ export default function AdminPage() {
         </ul>
       </section>
 
+      {/* 걸어 놓고 잊는 것을 막는다. 기한이 지난 정지는 저절로 풀리므로 나오지 않는다. */}
+      {suspended.length > 0 && (
+        <section className="mt-8">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-ink-faint">
+            정지 중인 사용자
+          </h2>
+          <ul className="mt-3 divide-y divide-border-subtle rounded border border-border bg-surface">
+            {suspended.map((user) => (
+              <li key={user.handle} className="flex flex-wrap items-center gap-3 px-5 py-3">
+                <span className="text-sm font-medium text-ink">@{user.handle}</span>
+                <span className="font-mono text-xs text-ink-faint">
+                  {new Date(user.suspended_until).toLocaleDateString('ko-KR')}까지
+                </span>
+                {user.reason && (
+                  <span className="text-xs text-ink-muted">— {user.reason}</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => unsuspend(user.handle)}
+                  className="ml-auto min-h-touch rounded border border-border px-4 text-sm font-medium text-ink hover:bg-surface-2"
+                >
+                  해제
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="mt-8">
         <h2 className="text-sm font-bold uppercase tracking-wider text-ink-faint">서버 오류</h2>
         {errors && errors.items.length === 0 ? (
@@ -191,16 +245,39 @@ export default function AdminPage() {
                   </span>
                 </button>
                 {open === group.fingerprint && (
-                  <pre className="overflow-x-auto border-t border-border-subtle bg-surface-2 px-5 py-4 font-mono text-xs leading-relaxed text-ink-muted">
-                    {group.traceback}
-                  </pre>
+                  <div className="border-t border-border-subtle">
+                    <pre className="overflow-x-auto bg-surface-2 px-5 py-4 font-mono text-xs leading-relaxed text-ink-muted">
+                      {group.traceback}
+                    </pre>
+                    <div className="flex items-center gap-3 px-5 py-3">
+                      <button
+                        type="button"
+                        onClick={() => resolveError(group.fingerprint)}
+                        className="min-h-touch rounded border border-border px-4 text-sm font-medium text-ink hover:bg-surface-2"
+                      >
+                        확인함
+                      </button>
+                      <span className="text-xs text-ink-faint">
+                        기록은 남습니다. 다시 나면 목록으로 돌아옵니다.
+                      </span>
+                    </div>
+                  </div>
                 )}
               </li>
             ))}
           </ul>
         )}
-        {/* 한계를 감추지 않는다. 모르고 믿는 게 없는 것보다 나쁘다. */}
-        {errors && <p className="mt-3 text-xs leading-relaxed text-ink-faint">{errors.note}</p>}
+        {/*
+          * 알림이 꺼져 있으면 그 사실이 보여야 한다.
+          * 안 그러면 "오류가 나면 연락이 오겠지" 라고 믿은 채로 아무 연락도 안 온다.
+          */}
+        {errors && !errors.alerting && (
+          <p className="mt-3 rounded border border-aging/40 bg-aging/8 px-4 py-3 text-xs leading-relaxed text-ink">
+            알림 통로가 설정돼 있지 않습니다. 새 오류가 나도 이 화면에 들어와야만 알 수 있습니다.
+            <code className="mx-1 font-mono">ALERT_EMAIL</code> 또는
+            <code className="mx-1 font-mono">ALERT_WEBHOOK_URL</code> 을 설정하세요.
+          </p>
+        )}
       </section>
     </div>
   )
