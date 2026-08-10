@@ -211,6 +211,15 @@ jobs:
         # 임시 DB 에 실제로 복원하고 표 별 행 수를 맞춰 본다.
         run: python -m scripts.verify_backup --latest --root ./backups
 
+      - name: 사본을 다른 곳에 두고 그 사본으로 복원되는지
+        working-directory: backend
+        # 같은 디스크에 둔 백업은 디스크가 죽는 순간 함께 죽는다.
+        # 사본을 만드는 것과 그 사본이 실제로 되살아나는 것은 다른 문제다.
+        run: |
+          python -m scripts.backup --out ./backups --skip-objects --replicate ./offsite
+          replica=$(ls -d ./offsite/*/ | tail -1)
+          python -m scripts.verify_backup "$replica"
+
       - name: 손상된 백업은 거부하는지
         working-directory: backend
         # 검증이 항상 통과하면 검증이 아니다. 일부러 잘라서 실패를 확인한다.
