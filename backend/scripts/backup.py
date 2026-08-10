@@ -182,6 +182,51 @@ def _alembic_revision() -> Optional[str]:
         engine.dispose()
 
 
+def _replicate(backup: Path, destination: str) -> Dict[str, Any]:
+    """백업을 다른 곳으로 한 벌 더 옮긴다.
+
+    같은 디스크에 둔 백업은 디스크가 죽는 순간 함께 죽는다.
+    백업의 목적이 "이 기계가 사라져도 되살린다" 라면 사본은 다른 곳에 있어야 한다.
+
+    목적지는 두 가지를 받는다.
+    - 경로: 마운트된 다른 볼륨, NAS, rclone 이 감시하는 폴더
+    - s3://버킷/접두어: 설정된 오브젝트 저장소 자격으로 올린다
+
+    옮기고 나서 **다시 읽어 크기를 대조한다.** 복사가 조용히 잘리는 일은 실제로 있고,
+    확인하지 않은 사본은 사본이 아니다.
+    """
+    files = [p for p in backup.rglob("*") if p.is_file()]
+
+    if destination.startswith("s3://"):
+        from src.infrastructure.external.storage import get_storage
+
+        without_scheme = destination[len("s3://"):].strip("/")
+        bucket, _, prefix = without_scheme.partition("/")
+        client = get_storage().client
+        copied = 0
+        for path in files:
+            key = "/".join(filter(None, [prefix, backup.name, path.relative_to(backup).as_posix()]))
+            client.upload_file(str(path), bucket, key)
+            # 올린 것을 다시 물어본다. 크기가 다르면 사본이 아니다.
+            size = client.head_object(Bucket=bucket, Key=key)["ContentLength"]
+            if size != path.stat().st_size:
+                raise SystemExit(f"복제본 크기가 다릅니다: {key}")
+            copied += 1
+        return {"destination": destination, "files": copied, "verified": True}
+
+    target = Path(destination).expanduser().resolve() / backup.name
+    target.mkdir(parents=True, exist_ok=True)
+    copied = 0
+    for path in files:
+        relative = path.relative_to(backup)
+        (target / relative).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, target / relative)
+        if (target / relative).stat().st_size != path.stat().st_size:
+            raise SystemExit(f"복제본 크기가 다릅니다: {relative}")
+        copied += 1
+    return {"destination": str(target), "files": copied, "verified": True}
+
+
 def _prune(root: Path, days: int) -> int:
     """오래된 백업을 지운다.
 
@@ -210,6 +255,11 @@ def main() -> int:
         help="로컬에 mariadb-dump 가 없을 때 쓸 DB 컨테이너 이름",
     )
     parser.add_argument("--skip-objects", action="store_true")
+    parser.add_argument(
+        "--replicate",
+        default=os.getenv("BACKUP_REPLICATE_TO", ""),
+        help="사본을 둘 곳. 경로 또는 s3://버킷/접두어. 같은 디스크의 백업은 디스크와 함께 죽는다.",
+    )
     parser.add_argument(
         "--retention-days", type=int, default=int(os.getenv("BACKUP_RETENTION_DAYS", "14"))
     )
@@ -248,6 +298,17 @@ def main() -> int:
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
+    replication: Dict[str, Any] = {"configured": False}
+    if args.replicate:
+        print(f"사본 복제 중 → {args.replicate}")
+        replication = {"configured": True, **_replicate(target, args.replicate)}
+        manifest["replication"] = replication
+        # manifest 를 다시 쓴다 — 복제 기록이 사본에는 없지만 원본에는 남아야
+        # "이 백업은 어디로 갔는가" 를 나중에 알 수 있다.
+        (target / "manifest.json").write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
     pruned = _prune(root, args.retention_days)
     rows = sum(manifest["row_counts"].values())
     print(
@@ -255,7 +316,13 @@ def main() -> int:
         f"{len(manifest['row_counts'])}개 표 {rows:,}행 · "
         f"파일 {objects.get('files', 0)}개"
         + (f" · 오래된 백업 {pruned}건 정리" if pruned else "")
+        + (f" · 사본 {replication['files']}개 → {replication['destination']}"
+           if replication.get("configured") else "")
     )
+    if not replication.get("configured"):
+        # 조용히 넘어가면 "백업이 있다" 고 믿게 된다. 어디에 있는지가 중요하다.
+        print("\n주의: 사본이 이 기계에만 있습니다. 디스크가 죽으면 백업도 함께 죽습니다.")
+        print("      --replicate <경로|s3://버킷/접두어> 로 다른 곳에 한 벌 더 두세요.")
     print("\n이 백업은 아직 검증되지 않았습니다. 다음을 함께 돌리세요:")
     print(f"  python -m scripts.verify_backup {target}")
     return 0

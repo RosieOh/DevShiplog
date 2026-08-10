@@ -77,12 +77,18 @@ export default function AdminReportsPage() {
     load()
   }, [status, router, load])
 
-  async function resolve(id: string, decision: 'resolved' | 'rejected', unpublish: boolean) {
+  async function resolve(
+    id: string,
+    decision: 'resolved' | 'rejected',
+    unpublish: boolean,
+    suspendDays = 0
+  ) {
     setBusy(id)
     try {
       await apiClient.post(`/api/v1/admin/reports/${id}/resolve`, {
         status: decision,
         unpublish_post: unpublish,
+        suspend_author_days: suspendDays,
       })
       // 처리한 건은 목록에서 바로 뺀다. 다시 불러오면 위치가 흔들려서
       // 방금 무엇을 처리했는지 알기 어려워진다.
@@ -190,14 +196,39 @@ export default function AdminReportsPage() {
                   조치함 (글은 유지)
                 </button>
                 {report.target?.kind === 'post' && (
-                  <button
-                    type="button"
-                    disabled={busy === report.id}
-                    onClick={() => resolve(report.id, 'resolved', true)}
-                    className="min-h-touch rounded bg-stale px-4 text-sm font-bold text-surface hover:opacity-90 disabled:opacity-50"
-                  >
-                    글 내리기
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      disabled={busy === report.id}
+                      onClick={() => resolve(report.id, 'resolved', true)}
+                      className="min-h-touch rounded bg-stale px-4 text-sm font-bold text-surface hover:opacity-90 disabled:opacity-50"
+                    >
+                      글 내리기
+                    </button>
+                    {/*
+                      * 반복하는 사람은 글을 하나씩 내리는 것으로 멈추지 않는다.
+                      * 여기서 끝낼 수 있어야 한다 — 다시 사용자를 찾아 들어가야 하면
+                      * 그 단계에서 그만두게 된다.
+                      */}
+                    <button
+                      type="button"
+                      disabled={busy === report.id}
+                      onClick={() => {
+                        if (
+                          confirm(
+                            `@${report.target?.author} 를 7일간 정지하고 글을 내립니다.
+` +
+                              '읽기는 계속 가능하고, 기한이 지나면 저절로 풀립니다.'
+                          )
+                        ) {
+                          resolve(report.id, 'resolved', true, 7)
+                        }
+                      }}
+                      className="min-h-touch rounded border border-stale px-4 text-sm font-bold text-stale hover:bg-stale/8 disabled:opacity-50"
+                    >
+                      글 내리고 7일 정지
+                    </button>
+                  </>
                 )}
               </div>
             </li>
@@ -207,6 +238,8 @@ export default function AdminReportsPage() {
 
       <p className="mt-8 text-xs leading-relaxed text-ink-faint">
         글 내리기는 글을 비공개(unlisted)로 바꿉니다. 지우지 않으므로 오판이면 되돌릴 수 있습니다.
+        정지는 기한제입니다 — 쓰기만 막히고 읽기는 되며, 기한이 지나면 저절로 풀립니다.
+        운영 화면에서 바로 해제할 수도 있습니다.
       </p>
     </div>
   )
