@@ -17,6 +17,7 @@ from src.domain.enums import PostStatus, ReportStatus, UserRole
 from src.infrastructure.config.settings import settings
 from src.infrastructure.database.session import get_db
 from src.infrastructure.observability import errors as error_store
+from src.infrastructure.observability import heartbeat
 from src.infrastructure.observability.health import readiness
 from src.ports.input.api.v1.dependencies import (
     get_admin_user_id,
@@ -300,5 +301,8 @@ def admin_readiness(_: str = Depends(get_admin_user_id)):
 
     /health/ready 와 같은 점검이지만, 운영자 화면에서 보려고 여기에도 둔다.
     공개 엔드포인트는 로드밸런서가 쓰고, 이건 사람이 본다.
+
+    하트비트 상태도 같이 준다. 이게 안 돌면 "서버가 죽어도 아무도 모르는" 상태로
+    돌아가는데, 그건 화면에 안 나오면 알 수가 없다.
     """
-    return readiness()
+    return {**readiness(), "heartbeat": heartbeat.status()}
