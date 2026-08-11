@@ -102,6 +102,13 @@ class Settings(BaseSettings):
     ALERT_ERROR_WINDOW_MINUTES: int = 60
     ALERT_REPORT_WINDOW_MINUTES: int = 30
 
+    # 하트비트(데드맨 스위치).
+    # 위의 알림은 전부 앱이 살아 있어야 나간다. 프로세스가 죽으면 아무 연락도 안 온다.
+    # 주기적으로 여기에 신호를 보내고, 끊기면 바깥에서 알리게 한다.
+    # 예: https://hc-ping.com/<uuid> (Healthchecks.io)
+    HEARTBEAT_URL: str = ""
+    HEARTBEAT_INTERVAL_SECONDS: int = 300
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,

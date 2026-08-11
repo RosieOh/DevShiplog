@@ -11,6 +11,7 @@ from src.application.errors import ApplicationError, StaleDraftError
 from src.infrastructure.config.settings import settings
 from src.infrastructure.observability.context import current_request_id, request_id_var
 from src.infrastructure.observability.errors import error_tracker, init_error_tracking
+from src.infrastructure.observability import heartbeat
 from src.infrastructure.observability.health import readiness
 from src.infrastructure.observability.logging_setup import configure_logging
 from src.infrastructure.observability.middleware import RequestContextMiddleware
@@ -41,7 +42,21 @@ async def lifespan(_: FastAPI):
             logger.warning(
                 "오브젝트 저장소 준비 실패 — 업로드가 동작하지 않을 수 있습니다", exc_info=True
             )
-    yield
+
+    # 하트비트. 설정돼 있을 때만 돈다.
+    # 이게 없으면 프로세스가 죽었을 때 알릴 방법이 아예 없다 —
+    # 앱이 보내는 알림은 앱이 살아 있어야 나가기 때문이다.
+    tasks: list = []
+    heartbeat.start(tasks)
+    if not settings.HEARTBEAT_URL and settings.is_production:
+        logger.warning(
+            "HEARTBEAT_URL 이 없습니다 — 프로세스가 죽으면 아무도 모릅니다"
+        )
+    try:
+        yield
+    finally:
+        for task in tasks:
+            task.cancel()
 
 
 app = FastAPI(
