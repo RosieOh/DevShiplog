@@ -49,6 +49,14 @@ interface Check {
   error?: string
 }
 
+interface Heartbeat {
+  configured: boolean
+  last_success: string | null
+  last_failure: string | null
+  last_error: string | null
+  sent: number
+}
+
 const CHECK_LABEL: Record<string, string> = {
   database: '데이터베이스',
   redis: 'Redis',
@@ -70,6 +78,7 @@ export default function AdminPage() {
   const [errors, setErrors] = useState<{ items: ErrorGroup[]; alerting: boolean } | null>(null)
   const [suspended, setSuspended] = useState<Suspended[]>([])
   const [checks, setChecks] = useState<Check[] | null>(null)
+  const [heartbeat, setHeartbeat] = useState<Heartbeat | null>(null)
   const [denied, setDenied] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
 
@@ -82,13 +91,14 @@ export default function AdminPage() {
     Promise.all([
       apiClient.get<Summary>('/api/v1/admin/summary'),
       apiClient.get<{ items: ErrorGroup[]; alerting: boolean }>('/api/v1/admin/errors'),
-      apiClient.get<{ checks: Check[] }>('/api/v1/admin/readiness'),
+      apiClient.get<{ checks: Check[]; heartbeat: Heartbeat }>('/api/v1/admin/readiness'),
       apiClient.get<{ items: Suspended[] }>('/api/v1/admin/users/suspended'),
     ])
       .then(([s, e, r, u]) => {
         setSummary(s)
         setErrors(e)
         setChecks(r.checks)
+        setHeartbeat(r.heartbeat)
         setSuspended(u.items)
       })
       // 서버는 권한 없음을 404 로 답한다. 화면의 존재를 광고하지 않기 위해서다.
@@ -182,6 +192,26 @@ export default function AdminPage() {
             </li>
           ))}
         </ul>
+        {/*
+          * 하트비트가 안 돌면 "서버가 죽어도 아무도 모르는" 상태로 돌아간다.
+          * 이 화면은 서버가 살아 있어야 보이므로, 여기서 확인할 수 있는 건
+          * "장치가 걸려 있는가" 까지다. 그것만으로도 안 걸어 둔 것과는 다르다.
+          */}
+        {heartbeat && !heartbeat.configured && (
+          <p className="mt-3 rounded border border-aging/40 bg-aging/8 px-4 py-3 text-xs leading-relaxed text-ink">
+            하트비트가 꺼져 있습니다. 프로세스가 죽거나 기계가 꺼지면 알림도 함께 멈춰서
+            아무 연락도 오지 않습니다. <code className="mx-1 font-mono">HEARTBEAT_URL</code>
+            을 설정하세요 (Healthchecks.io 등).
+          </p>
+        )}
+        {heartbeat?.configured && (
+          <p className="mt-3 text-xs leading-relaxed text-ink-faint">
+            하트비트 {heartbeat.sent}회 전송
+            {heartbeat.last_success &&
+              ` · 마지막 성공 ${new Date(heartbeat.last_success).toLocaleString('ko-KR')}`}
+            {heartbeat.last_error && ` · ${heartbeat.last_error}`}
+          </p>
+        )}
       </section>
 
       {/* 걸어 놓고 잊는 것을 막는다. 기한이 지난 정지는 저절로 풀리므로 나오지 않는다. */}
