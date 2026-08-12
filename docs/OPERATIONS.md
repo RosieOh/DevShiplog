@@ -301,6 +301,110 @@ $ python -m scripts.verify_backup /mnt/nas/devshiplog/20260810T025421Z
 
 ---
 
+## 4. 열기 전에 사람이 해야 할 것
+
+코드로 끝나지 않는 것들이다. 여기까지 해야 "장애가 나면 안다" 가 성립한다.
+**안 해도 서비스는 돈다** — 그래서 미루기 쉽고, 미루면 정작 필요한 날에 없다.
+
+| 할 일 | 안 하면 | 걸리는 시간 |
+|---|---|---|
+| 알림 통로 (`ALERT_*`) | 오류가 나도 `/admin` 에 들어와야만 안다 | 5분 |
+| 하트비트 (`HEARTBEAT_URL`) | 프로세스가 죽으면 아무 연락도 안 온다 | 10분 |
+| 백업 복제 (`BACKUP_REPLICATE_TO`) | 디스크가 죽으면 백업도 같이 죽는다 | 10분 |
+| 백업 cron | 백업이 없다 | 5분 |
+
+알림 통로와 하트비트는 안 걸려 있으면 `/admin` 화면이 알려준다.
+백업 쪽은 화면이 아니라 `scripts/backup` 실행 때 경고로 나온다 —
+cron 으로 돌리면 로그에만 남으므로, 이건 사람이 챙겨야 한다.
+
+조용히 넘어가면 "오류가 나면 연락이 오겠지" 라고 믿은 채로 아무 연락도 안 온다.
+
+---
+
+### 알림 통로
+
+**개발** — Mailpit 으로 받으면 외부 계정 없이 경로 전체를 확인할 수 있다.
+
+```bash
+SMTP_HOST=localhost
+SMTP_PORT=1125          # docker compose 매핑 확인: docker port devshiplog-mailpit
+ALERT_EMAIL=ops@devshiplog.local
+```
+
+실측 (2026-08-11, 신고 접수 → Mailpit 수신):
+
+```
+제목: [Devshiplog] 신고 3건 대기
+받는 사람: ops@devshiplog.local
+
+새 신고: post · 사유 spam
+처리 대기 3건
+
+http://localhost:3001/admin/reports
+```
+
+**실서비스 — 웹훅을 권한다.** 메일보다 나은 이유는 스팸함에 안 들어가고
+휴대폰 알림이 확실해서다. 장애 알림은 늦게 보면 없는 것과 같다.
+
+- Slack: 워크스페이스 → Apps → Incoming Webhooks → 채널 선택 → URL 복사
+- Discord: 채널 설정 → 연동 → 웹후크 → URL 복사
+
+```bash
+ALERT_WEBHOOK_URL=https://hooks.slack.com/services/...
+```
+
+메일로 갈 거면 `SMTP_*` 를 실제 서버(SES·Postmark·Gmail 앱 비밀번호)로 바꾼다.
+
+### 하트비트
+
+[Healthchecks.io](https://healthchecks.io) 무료 플랜이 체크 20개라 충분하다.
+
+1. Add Check → 이름 `devshiplog-api`
+2. **Period 5분 / Grace Time 5분** — 5분마다 보내니 10분 넘게 조용하면 알린다
+3. Ping URL 을 `HEARTBEAT_URL` 에 넣는다
+4. 알림 받을 곳은 Healthchecks 쪽에서 설정한다 (여기 알림과 별개다)
+
+```bash
+HEARTBEAT_URL=https://hc-ping.com/<uuid>
+HEARTBEAT_INTERVAL_SECONDS=300
+```
+
+**Grace Time 을 Period 보다 짧게 두지 않는다.** 신호가 조금만 늦어도 오탐이 뜨고,
+오탐이 몇 번 반복되면 그 알림을 무시하게 된다. 무시하는 알림은 없는 알림이다.
+
+UptimeRobot 처럼 바깥에서 `/health` 를 두드리는 방식도 있지만 하트비트가 낫다.
+**서버가 응답은 하는데 DB 가 끊긴 상태**를 밖에서 두드리는 감시는 정상으로 본다.
+하트비트는 준비 상태를 확인하고 보내므로 그 경우 실패 신호를 보낸다.
+
+둘을 같이 쓰면 서로의 빈틈을 메운다 — 여유가 되면 둘 다 건다.
+
+### 백업 복제 · cron
+
+명령과 옵션은 [3. 백업](#3-백업) 에 있다. 여기서 정할 것은 하나 —
+**"다른 기계" 를 무엇으로 볼 것인가.** 이 코드는 목적지가 실제로 다른 기계인지 알 수 없다.
+
+| 선택지 | 실효성 |
+|---|---|
+| 같은 기계의 다른 디스크 | 디스크 고장은 막지만 **기계가 죽으면 같이 죽는다** |
+| 외장 하드 · NAS 경로 | 실질적으로 유효 |
+| rclone → 개인 클라우드 | 무료 용량으로 충분. 가장 현실적 |
+
+```bash
+BACKUP_REPLICATE_TO=/mnt/nas/devshiplog
+# 클라우드로 보낼 거면 백업 cron 뒤에 한 줄:
+rclone sync ./backups gdrive:devshiplog-backups
+```
+
+cron 은 백업과 **검증을 같이** 건다. 백업만 걸면 정작 필요한 날에
+"덤프가 비어 있었다" 를 처음 알게 된다.
+
+---
+
+### 지금 안 해도 되는 것
+
+- **워커별 감시.** 단일 프로세스로 돌면 해당이 없다. 워커를 여럿 띄우게 되면
+  그때 로드밸런서가 `/health/ready` 로 죽은 워커를 빼면 된다. 미리 만들 이유가 없다.
+
 ## 아직 없는 것
 
 솔직하게 적어 둔다.

@@ -188,6 +188,7 @@ npm run build
 ## 📖 문서
 
 - [개발 가이드](./docs/DEVELOPMENT_GUIDE.md)
+- [운영](./docs/OPERATIONS.md) — 운영자 · 관측 · 백업, 그리고 **열기 전에 사람이 해야 할 것**
 - [프로젝트 구조](./docs/PROJECT_STRUCTURE.md)
 - [구현 가능성 검토](./docs/IMPLEMENTATION_FEASIBILITY.md)
 - API 문서: 서버 실행 후 http://localhost:8000/docs (프로덕션에서는 비활성화)
