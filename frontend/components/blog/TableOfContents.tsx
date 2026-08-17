@@ -39,11 +39,10 @@ export default function TableOfContents({ items }: { items: TocItem[] }) {
   if (items.length < 2) return null
 
   return (
-    <nav
-      aria-label="목차"
-      className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto border-l border-border pl-4"
-    >
-      <p className="mb-3 text-xs font-bold uppercase tracking-wider text-ink-faint">목차</p>
+    // 고정(sticky)과 스크롤은 감싸는 쪽(PostAside)이 맡는다.
+    // 여기서 또 sticky 를 걸면 고정 안에 고정이 생겨 스크롤이 어긋난다.
+    <nav aria-label="목차">
+      <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-ink-faint">목차</h2>
       <ul className="space-y-2 text-sm">
         {items.map((item) => {
           const active = item.id === activeId
