@@ -153,8 +153,14 @@ def root():
 
 
 @app.get("/health")
-def health():
-    """살아있는가. 재시작 판단용이라 아무것도 두드리지 않는다."""
+async def health():
+    """살아있는가. 재시작 판단용이라 아무것도 두드리지 않는다.
+
+    async 로 둔다. 동기(def)로 두면 스레드풀에서 도는데, DB 가 느려져 스레드가
+    전부 대기에 묶이면 **아무것도 안 하는 이 경로마저 응답을 멈춘다.**
+    실측으로 확인했다 — 커넥션 풀이 고갈되자 /health 가 60초 넘게 무응답이었고,
+    로드밸런서가 봤다면 멀쩡한 프로세스를 죽였을 것이다.
+    """
     return {"status": "healthy", "version": settings.APP_VERSION}
 
 

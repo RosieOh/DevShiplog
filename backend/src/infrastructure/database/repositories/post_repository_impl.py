@@ -4,7 +4,7 @@ from typing import List, Optional, Sequence
 
 from sqlalchemy import case, func, or_, select, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from src.domain.enums import PostStatus
 from src.infrastructure.database.models.post import Post
@@ -33,9 +33,15 @@ def _boolean_mode_query(term: str) -> str:
 
 
 # 목록에서 태그와 작성자를 매번 개별 조회하면 N+1 이 된다.
+#
+# 스택도 같은 이유로 미리 당긴다. 카드에 배지로 나가는데 lazy 로 두면
+# 글 20개짜리 피드가 쿼리 21개가 된다 (실측: SELECT 수 = limit + 1).
+# selectinload 를 쓰는 이유: joinedload 로 묶으면 스택 수만큼 행이 불어나
+# limit 이 글이 아니라 행에 걸린다.
 _LIST_LOADS = (
     joinedload(Post.user),
     joinedload(Post.tags).joinedload(PostTag.tag),
+    selectinload(Post.stacks),
 )
 
 
