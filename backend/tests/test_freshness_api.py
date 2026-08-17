@@ -1,5 +1,7 @@
 """스택·검증·독자 신호 API."""
 
+import pytest
+
 from datetime import datetime, timedelta, timezone
 
 
@@ -307,3 +309,77 @@ def test_목록_카드에도_신선도가_실린다(client):
     item = client.get("/api/v1/public/feed?limit=1").json()["items"][0]
     assert item["freshness"]["level"] in ("stale", "aging", "unverified")
     assert item["stacks"][0]["name"] == "react"
+
+
+# ----------------------------------------------------------- 판정 규칙 자체
+#
+# 아래는 실제로 앱을 띄워 보고 발견한 것이다.
+# 오늘 발행한 Spring Boot 3.2 + Java 17 글이 피드에서 빨간 "오래됨" 으로 떴다.
+
+
+def _stack(name, version):
+    from src.domain.services.tech_stack import DetectedStack
+
+    return DetectedStack(name, version, "high", "테스트")
+
+
+def _today():
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+@pytest.mark.parametrize("version", ["17", "21"])
+def test_LTS_는_뒤처진_것으로_치지_않는다(version):
+    """Java 최신은 23 이지만 현업 대부분이 LTS(17·21)에 있다.
+
+    LTS 글을 전부 뒤처진 것으로 치면 자바 글의 대부분이 빨갛게 되고,
+    빨간 딱지가 흔해지는 순간 아무도 그 딱지를 안 본다.
+    """
+    from src.domain.services.freshness import evaluate
+
+    result = evaluate(published_at=_today(), verified_at=None, stacks=[_stack("java", version)])
+    assert result.outdated == []
+    assert result.level == "unverified"
+
+
+def test_지원_끝난_메이저는_여전히_잡는다():
+    """LTS 예외가 "아무것도 안 잡는다" 로 새면 기능 자체가 없는 것과 같다."""
+    from src.domain.services.freshness import evaluate
+
+    result = evaluate(published_at=_today(), verified_at=None, stacks=[_stack("java", "11")])
+    assert [s["name"] for s in result.outdated] == ["java"]
+
+
+def test_오늘_쓴_글은_오래됨이_되지_않는다():
+    """예전에는 unverified 를 곧장 stale 로 보내서, 오늘 쓴 글이
+    18개월 방치된 글과 같은 표시를 달았다. 날짜가 오늘인데 "오래됨" 이면
+    독자는 표시를 안 믿게 된다."""
+    from src.domain.services.freshness import evaluate
+
+    result = evaluate(published_at=_today(), verified_at=None, stacks=[_stack("react", "17")])
+    assert result.level == "aging"
+
+
+def test_한_번에_한_단계씩만_내린다():
+    from datetime import timedelta
+
+    from src.domain.services.freshness import evaluate
+
+    fresh = evaluate(
+        published_at=_today(), verified_at=_today(), stacks=[_stack("react", "17")]
+    )
+    assert fresh.level == "aging"  # fresh → aging
+
+    long_ago = _today() - timedelta(days=400)
+    aging = evaluate(published_at=long_ago, verified_at=long_ago, stacks=[_stack("react", "17")])
+    assert aging.level == "stale"  # aging → stale
+
+
+def test_뒤처진_스택이_없으면_단계를_안_내린다():
+    from src.domain.services.freshness import evaluate
+
+    result = evaluate(
+        published_at=_today(), verified_at=_today(), stacks=[_stack("react", "19")]
+    )
+    assert result.level == "fresh"

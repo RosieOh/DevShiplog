@@ -244,8 +244,28 @@ def test_admin_can_see_errors_and_readiness(
     errors = client.get("/api/v1/admin/errors", headers=auth_headers).json()
     assert errors["items"][0]["type"] == "RuntimeError"
     assert errors["error_groups"] == 1
-    # 알림 통로가 설정돼 있는지 화면이 알아야 한다.
-    # 안 그러면 "오류가 나면 연락이 오겠지" 라고 믿은 채로 아무 연락도 안 온다.
-    assert errors["alerting"] is False
 
     assert client.get("/api/v1/admin/readiness", headers=auth_headers).json()["checks"]
+
+
+def test_admin_sees_whether_alerting_is_configured(client, db_session, auth_headers, monkeypatch):
+    """알림 통로가 설정돼 있는지 화면이 알아야 한다.
+
+    안 그러면 "오류가 나면 연락이 오겠지" 라고 믿은 채로 아무 연락도 안 온다.
+
+    설정값을 직접 지정한다 — 개발자의 .env 를 그대로 읽으면 이 테스트는
+    "지금 이 기계에 무엇이 설정돼 있나" 를 확인하게 되고, 그건 검증이 아니다.
+    """
+    from src.infrastructure.config.settings import settings
+
+    user_id = client.get("/api/v1/auth/me", headers=auth_headers).json()["id"]
+    user = db_session.query(User).filter(User.id == user_id).first()
+    user.role = UserRole.ADMIN
+    db_session.commit()
+
+    monkeypatch.setattr(settings, "ALERT_EMAIL", "")
+    monkeypatch.setattr(settings, "ALERT_WEBHOOK_URL", "")
+    assert client.get("/api/v1/admin/errors", headers=auth_headers).json()["alerting"] is False
+
+    monkeypatch.setattr(settings, "ALERT_EMAIL", "ops@example.com")
+    assert client.get("/api/v1/admin/errors", headers=auth_headers).json()["alerting"] is True

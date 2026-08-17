@@ -73,3 +73,6 @@ e2e/browser/*.json
 # 백업 산출물 — 여기에 실제 사용자 데이터가 들어간다. 절대 커밋하지 않는다.
 backups/
 backend/backups/
+
+# 기계마다 잡힌 포트가 달라서 로컬에서만 쓰는 compose 오버라이드
+docker-compose.override.yml
