@@ -39,6 +39,25 @@ LATEST_MAJOR: Dict[str, int] = {
     "tailwindcss": 4, "vite": 6, "kubernetes": 1,
 }
 
+# 최신은 아니지만 **아직 멀쩡한** 메이저.
+#
+# 최신 메이저만 기준으로 삼으면 LTS 를 쓰는 글이 전부 뒤처진 것이 된다.
+# Java 는 23 이 최신이지만 현업 대부분이 17·21(LTS)에 있고, Node 도 짝수 LTS 를 쓴다.
+# 오늘 쓴 Spring Boot 3.2 + Java 17 글에 빨간 딱지를 붙이면
+# 그 딱지는 곧 아무도 안 보는 딱지가 된다 — 경고는 흔해지는 순간 죽는다.
+#
+# LATEST_MAJOR 와 같은 이유로 손으로 관리한다. 지원 종료(EOL)가 지나면 여기서 뺀다.
+# 갱신 시점: 2026-08.
+STILL_SUPPORTED: Dict[str, set] = {
+    # Java LTS. 8 은 뺐다 — 아직 쓰는 곳은 있지만 새 글의 기준으로는 낡았다.
+    "java": {17, 21},
+    # Node 짝수 버전만 LTS 가 된다.
+    "nodejs": {20},
+    # 유지보수 기간이 길어 실제로 많이 쓰인다.
+    "postgresql": {15, 16},
+    "python": {3},
+}
+
 
 @dataclass
 class StackRef:
@@ -69,12 +88,17 @@ def outdated_stacks(stacks: List[StackRef]) -> List[Dict[str, object]]:
 
     마이너 차이는 세지 않는다. React 18.2 → 18.3 때문에 글이 틀리는 일은 드물고,
     그걸로 경고를 띄우면 경고가 흔해져서 아무도 안 본다.
+
+    아직 지원되는 메이저(LTS 등)도 세지 않는다. 같은 이유다 —
+    Java 17 글을 전부 뒤처진 것으로 치면 자바 글의 대부분이 빨갛게 된다.
     """
     behind = []
     for stack in stacks:
         current = LATEST_MAJOR.get(stack.name)
         written = _major(stack.version)
         if current is None or written is None:
+            continue
+        if written in STILL_SUPPORTED.get(stack.name, ()):
             continue
         if written < current:
             behind.append(
@@ -115,13 +139,20 @@ def evaluate(
     else:
         level, reason = STALE, f"마지막 확인이 {days}일 전입니다."
 
-    # 메이저가 뒤처졌으면 검증이 아무리 최근이어도 한 단계 내린다.
+    # 메이저가 뒤처졌으면 검증이 아무리 최근이어도 **한 단계** 내린다.
     # "6개월 전에 확인함" 이 "React 17 기준" 을 덮지는 못한다.
+    #
+    # 한 단계씩만 내리는 게 중요하다. 예전에는 unverified 를 곧장 stale 로 보내서,
+    # 오늘 쓴 글이 18개월 방치된 글과 같은 표시를 달았다. 독자가 날짜를 보고
+    # "오늘 쓴 글인데 왜 오래됨이지" 라고 느끼는 순간 이 표시는 신뢰를 잃는다.
     if behind:
         names = ", ".join(f"{s['name']} {s['version']}" for s in behind[:3])
         if level == FRESH:
             level = AGING
-        elif level in (AGING, UNVERIFIED):
+        elif level == UNVERIFIED:
+            # 검증한 적 없고 버전도 뒤처졌다 → "확인이 필요하다" 까지가 우리가 아는 전부다.
+            level = AGING
+        elif level == AGING:
             level = STALE
         reason = f"{names} 기준입니다. 이후 메이저 버전이 나왔습니다."
 

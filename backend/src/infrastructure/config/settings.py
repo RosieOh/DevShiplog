@@ -9,6 +9,16 @@ INSECURE_SECRET_KEY = "change-me-in-production"
 class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "mysql+pymysql://devshiplog:devshiplog@localhost:3306/devshiplog"
+    # 커넥션 풀.
+    #
+    # SQLAlchemy 기본값은 5+10=15 인데, 동기 엔드포인트를 돌리는 스레드풀은 40 이다.
+    # 40 개 스레드가 15 개 커넥션을 두고 다투면 나머지는 줄을 서고, 줄이 길어지면
+    # 스레드가 전부 대기에 묶여 /health 조차 답하지 못한다 (실측으로 확인).
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 20
+    # 기본 30초는 너무 길다. 30초를 기다린 응답은 이미 사용자가 떠난 뒤고,
+    # 그동안 스레드만 붙잡고 있어서 장애를 키운다. 빨리 실패하는 편이 낫다.
+    DB_POOL_TIMEOUT: int = 5
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
