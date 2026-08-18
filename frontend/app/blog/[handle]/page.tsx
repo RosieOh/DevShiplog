@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import Avatar from '@/components/ui/Avatar'
-import PostCard from '@/components/blog/PostCard'
+import PostRow from '@/components/blog/PostRow'
 import FollowButton from '@/components/blog/FollowButton'
 import { getBlog, getBlogPosts, SITE_NAME, SITE_URL } from '@/lib/api/public'
 
@@ -39,7 +39,8 @@ export default async function BlogHomePage({ params }: Props) {
   if (!blog) notFound()
 
   return (
-    <div className="mx-auto max-w-shell px-4 py-12 md:px-6">
+    <div className="mx-auto w-full max-w-shell px-4 py-12 md:px-6">
+      <div className="mx-auto w-full max-w-content lg:mx-0">
       <header className="border-b border-border pb-10">
         <div className="flex flex-wrap items-start gap-6">
           <Avatar
@@ -97,15 +98,16 @@ export default async function BlogHomePage({ params }: Props) {
 
       <main className="pt-8">
         {posts && posts.items.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="divide-y divide-border-subtle">
             {posts.items.map((post) => (
-              <PostCard key={post.id} post={post} />
+              <PostRow key={post.id} post={post} />
             ))}
           </div>
         ) : (
           <p className="py-20 text-center text-ink-muted">아직 발행한 글이 없습니다.</p>
         )}
       </main>
+    </div>
     </div>
   )
 }

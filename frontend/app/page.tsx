@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import PostCard from '@/components/blog/PostCard'
+import PostRow from '@/components/blog/PostRow'
 import { getFeed, SITE_NAME, SITE_URL } from '@/lib/api/public'
 
 /**
@@ -107,7 +107,8 @@ export default async function HomePage({
   }
 
   return (
-    <div className="mx-auto max-w-shell px-4 py-6 md:px-6">
+    <div className="mx-auto w-full max-w-shell px-4 py-6 md:px-6">
+      <div className="mx-auto w-full max-w-content lg:mx-0">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-border">
         <nav aria-label="정렬" className="flex items-center gap-5 sm:gap-6">
           {SORTS.map((tab) => {
@@ -164,13 +165,18 @@ export default async function HomePage({
       ) : (
         <>
           <h1 className="sr-only">{SORTS.find((s) => s.key === sort)?.label} 글</h1>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/*
+            * 항목 사이는 선 하나로만 나눈다. 카드로 감싸면 목록이 상자의 나열이 되고,
+            * 상자가 같은 크기로 늘어서는 순간 무엇을 먼저 읽을지가 사라진다.
+            */}
+          <div className="divide-y divide-border-subtle">
             {posts.map((post) => (
-              <PostCard key={post.id} post={post} />
+              <PostRow key={post.id} post={post} />
             ))}
           </div>
         </>
       )}
+    </div>
     </div>
   )
 }
