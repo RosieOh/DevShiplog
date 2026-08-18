@@ -167,6 +167,20 @@ alembic downgrade -1
 - React DevTools
 - Next.js 개발 모드: 자동 리로드
 
+#### `Cannot find module './vendor-chunks/*.js'`
+
+**dev 서버가 떠 있는 동안 `npm run build` 를 돌리면 난다.** 둘 다 `.next` 를 쓰는데
+빌드가 dev 서버가 물고 있던 청크를 덮어써서, 그 뒤로 모든 페이지가 500 이 된다.
+코드는 멀쩡하므로 아무리 들여다봐도 원인이 안 보인다.
+
+```bash
+# dev 를 내리고
+rm -rf frontend/.next
+npx next dev -p 3001
+```
+
+빌드로 검증해야 하면 dev 를 먼저 내린다. 둘을 같이 돌리지 않는다.
+
 ## 성능 최적화
 
 1. **LLM 호출 최적화**
