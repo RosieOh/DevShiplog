@@ -1,14 +1,21 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import PostRow from '@/components/blog/PostRow'
-import { getFeed, SITE_NAME, SITE_URL } from '@/lib/api/public'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import Landing from '@/components/landing/Landing'
+import { getFeed, getPopularStacks, SITE_NAME, SITE_URL } from '@/lib/api/public'
 
 /**
- * 홈 = 공개 피드.
+ * 홈. 보는 사람에 따라 다른 화면을 준다.
  *
- * 마케팅 랜딩이 아니라 글 목록을 루트에 둔다. 블로그 플랫폼에서 `/` 는
- * 검색엔진이 가장 먼저 크롤링하는 페이지이고, 여기에 실제 콘텐츠가 있어야
- * 내부 링크를 타고 글까지 도달한다. 소개 페이지는 /about 으로 옮겼다.
+ * - 로그인 안 함 → 랜딩. 처음 온 사람에게 모르는 사람 글 20개를 보여주면
+ *   이게 뭐 하는 곳인지, 왜 여기 써야 하는지를 알 방법이 없다.
+ * - 로그인함 → 피드. 돌아온 사람에게 소개를 다시 읽히면 클릭만 늘어난다.
+ *
+ * 예전 주석은 "`/` 에 콘텐츠가 있어야 크롤러가 글까지 간다" 였는데, 이 프로젝트에는
+ * sitemap.ts 와 robots.ts 가 있고 백엔드가 전체 글 목록을 낸다. 크롤러는 `/` 를
+ * 거치지 않고 사이트맵으로 글에 바로 간다.
  */
 export const metadata: Metadata = {
   title: `${SITE_NAME} — 개발자를 위한 기술 블로그`,
@@ -95,6 +102,17 @@ export default async function HomePage({
 }) {
   const sort = (SORTS.find((s) => s.key === searchParams.sort)?.key ?? 'recent') as Sort
   const period = (PERIODS.find((p) => p.key === searchParams.period)?.key ?? 'week') as Period
+
+  const session = await getServerSession(authOptions)
+
+  // 처음 온 사람에게는 랜딩. 검색 크롤러도 여기를 보지만, 글은 사이트맵으로 간다.
+  if (!session) {
+    const [stacks, recent] = await Promise.all([
+      getPopularStacks(12),
+      getFeed({ sort: 'recent', limit: 5 }),
+    ])
+    return <Landing stacks={stacks ?? []} posts={recent?.items ?? []} />
+  }
 
   const feed = await getFeed({ sort, period, limit: 24 })
   const posts = feed?.items ?? []

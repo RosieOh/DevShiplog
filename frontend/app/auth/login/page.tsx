@@ -1,13 +1,28 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
+/*
+ * useSearchParams 는 정적 프리렌더를 막으므로 Suspense 안에 둬야 한다.
+ * 감싸지 않으면 빌드가 이 페이지에서 실패한다.
+ */
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  )
+}
+
+function LoginForm() {
   const router = useRouter()
-  const [isSignUp, setIsSignUp] = useState(false)
+  // 랜딩의 "글 쓰러 가기" 는 계정이 없는 사람이 누른다. 로그인 폼에 떨어뜨리면
+  // 가입 링크를 한 번 더 찾아야 하고, 그 한 번에서 사람이 빠진다.
+  const signUpRequested = useSearchParams().get('mode') === 'signup'
+  const [isSignUp, setIsSignUp] = useState(signUpRequested)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
