@@ -9,7 +9,7 @@ import SeriesNav from '@/components/blog/SeriesNav'
 import StackBadges from '@/components/blog/StackBadges'
 import FreshnessBanner from '@/components/blog/FreshnessBadge'
 import WorksSignal from '@/components/blog/WorksSignal'
-import TableOfContents from '@/components/blog/TableOfContents'
+import PostAside from '@/components/blog/PostAside'
 import FloatingActions from '@/components/blog/FloatingActions'
 import { extractToc } from '@/lib/toc'
 import { absoluteUrl, formatDate, getPost, SITE_NAME, SITE_URL } from '@/lib/api/public'
@@ -95,7 +95,7 @@ export default async function PostPage({ params }: Props) {
         initialLikeCount={post.like_count}
       />
 
-      <div className="mx-auto grid max-w-shell grid-cols-1 gap-10 px-4 py-12 md:px-6 lg:grid-cols-[minmax(0,1fr)_220px]">
+      <div className="mx-auto grid max-w-shell grid-cols-1 gap-10 px-4 py-12 md:px-6 lg:grid-cols-[minmax(0,1fr)_248px]">
       <article className="mx-auto w-full max-w-content lg:mx-0">
         <header>
           <h1 className="text-[2rem] font-extrabold leading-[1.3] tracking-tight text-ink text-balance md:text-[2.5rem]">
@@ -124,8 +124,12 @@ export default async function PostPage({ params }: Props) {
             )}
           </div>
 
+          {/*
+            * 넓은 화면에서는 사이드바가 같은 내용을 세로로, 더 읽기 좋게 보여준다.
+            * 둘 다 띄우면 같은 말을 두 번 하는 것이라 제목 주변만 복잡해진다.
+            */}
           {post.stacks.length > 0 && (
-            <div className="mt-4">
+            <div className="mt-4 lg:hidden">
               <StackBadges stacks={post.stacks} />
             </div>
           )}
@@ -219,11 +223,18 @@ export default async function PostPage({ params }: Props) {
         />
       </article>
 
-      {toc.length >= 2 && (
-        <aside className="hidden lg:block">
-          <TableOfContents items={toc} />
-        </aside>
-      )}
+      {/*
+        * 목차가 없어도 사이드바는 뜬다. 채워야 할 것은 빈 공간이 아니라
+        * "읽기 전에 알아야 할 것" 이고, 그건 목차가 없는 글에도 있다.
+        */}
+      <aside className="hidden lg:block" aria-label="글 정보">
+        <PostAside
+          stacks={post.stacks}
+          freshness={post.freshness}
+          author={post.author}
+          toc={toc}
+        />
+      </aside>
       </div>
     </>
   )
