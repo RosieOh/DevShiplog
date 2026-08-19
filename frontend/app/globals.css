@@ -1,3 +1,6 @@
+/* 자체 호스팅 Pretendard (유니코드 범위별 분할). */
+@import url('/fonts/pretendard/pretendard.css');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -86,11 +89,17 @@ body {
   color: rgb(var(--text));
   line-height: 1.5;
   /*
-   * Velog 와 같은 계열의 시스템 스택. 한글 폰트를 웹폰트로 내려받으면
-   * 수 MB 가 되고, 한국어 사용자의 OS 에는 이미 좋은 본문 서체가 있다.
+   * Pretendard 를 자체 호스팅한다. 시스템 스택을 쓰면 OS 마다 다른 글자로 보이고,
+   * 자간·굵기 단계가 제각각이라 위계를 설계할 수가 없다.
+   *
+   * 용량 걱정은 유니코드 범위별로 쪼갠 파일(dynamic subset)로 푼다 — 저장소에는
+   * 3.2MB 가 들어가지만 방문자는 그 페이지에 실제로 쓰인 글자 범위만 받는다.
+   * 한국어 본문 한 페이지는 대개 100KB 안쪽이다.
+   *
+   * 시스템 스택은 뒤에 그대로 남긴다. 폰트가 늦거나 실패해도 글은 읽혀야 한다.
    */
-  font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard',
-    'Malgun Gothic', 'Noto Sans KR', 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Pretendard Variable', -apple-system, BlinkMacSystemFont,
+    'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   /*
    * 한글은 글자 단위로 줄바꿈되는 것이 기본이라 "뒤집으면" 이 "뒤 / 집으면" 으로 갈린다.
@@ -141,6 +150,43 @@ body {
  * 글 본문(Markdown).
  * 읽기가 목적인 영역이라 본문을 16px 이상, 행간을 넉넉히 준다.
  */
+/*
+ * 브라우저가 그려 주는 부분도 이 디자인의 일부다.
+ * 선택 색·캐럿·스크롤바를 손대지 않으면 그것들만 OS 기본값으로 남아,
+ * 화면이 "만들어진 것" 이 아니라 "조립된 것" 처럼 보인다.
+ */
+::selection {
+  background-color: rgb(var(--accent) / 0.22);
+  color: rgb(var(--text));
+}
+
+:root {
+  caret-color: rgb(var(--accent));
+  /* 파이어폭스 계열 */
+  scrollbar-color: rgb(var(--border)) transparent;
+  scrollbar-width: thin;
+}
+
+/* 크로미움·사파리 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--border));
+  border: 2px solid rgb(var(--bg));
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(var(--text-faint));
+}
+
 .prose {
   @apply text-[1.0625rem] leading-[1.8] text-ink;
 }
@@ -259,7 +305,10 @@ body {
 }
 
 .prose a {
-  @apply text-accent-text underline underline-offset-2 hover:opacity-80;
+  @apply text-accent-text underline hover:opacity-80;
+  /* 한글은 받침이 내려와서 기본 밑줄이 글자에 붙어 보인다. */
+  text-underline-offset: 0.25em;
+  text-decoration-thickness: 1px;
 }
 
 /* 1px 규칙 + 들여쓰기로 인용을 표현한다. 두꺼운 컬러 보더는 쓰지 않는다. */

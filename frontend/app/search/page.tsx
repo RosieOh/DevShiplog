@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import PostCard from '@/components/blog/PostCard'
+import PostRow from '@/components/blog/PostRow'
 import { searchPosts } from '@/lib/api/public'
 
 export const metadata: Metadata = {
@@ -19,7 +19,8 @@ export default async function SearchPage({
 
   return (
     <div className="bg-bg min-h-screen">
-      <div className="mx-auto max-w-[820px] px-[5%] py-12">
+      <div className="mx-auto w-full max-w-shell px-4 py-12 md:px-6">
+      <div className="mx-auto w-full max-w-content lg:mx-0">
         <form action="/search" method="get" className="border-b border-border pb-8">
           <label htmlFor="q" className="block text-sm font-semibold text-ink">
             검색
@@ -50,9 +51,11 @@ export default async function SearchPage({
               <h1 className="py-6 text-sm text-ink-muted">
                 “{query}” 검색 결과 {posts.length}건
               </h1>
-              {posts.map((post) => (
-                <PostCard key={post.id} post={post} />
-              ))}
+              <div className="divide-y divide-border-subtle">
+                {posts.map((post) => (
+                  <PostRow key={post.id} post={post} />
+                ))}
+              </div>
             </>
           ) : (
             <p className="py-16 text-center text-ink-muted">
@@ -61,6 +64,7 @@ export default async function SearchPage({
           )}
         </main>
       </div>
+    </div>
     </div>
   )
 }

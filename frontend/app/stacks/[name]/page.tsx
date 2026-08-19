@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import PostCard from '@/components/blog/PostCard'
+import PostRow from '@/components/blog/PostRow'
 import { getPostsByStack, SITE_NAME, SITE_URL, type StackSort } from '@/lib/api/public'
 
 interface Props {
@@ -56,7 +56,8 @@ export default async function StackPage({ params, searchParams }: Props) {
   ).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
 
   return (
-    <div className="mx-auto max-w-shell px-4 py-8 md:px-6">
+    <div className="mx-auto w-full max-w-shell px-4 py-8 md:px-6">
+      <div className="mx-auto w-full max-w-content lg:mx-0">
       <header className="border-b border-border pb-6">
         <p className="text-xs font-bold uppercase tracking-wider text-ink-faint">기술 스택</p>
         <h1 className="mt-2 font-mono text-3xl font-bold tracking-tight text-ink">
@@ -133,12 +134,13 @@ export default async function StackPage({ params, searchParams }: Props) {
           </Link>
         </div>
       ) : (
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-6 divide-y divide-border-subtle">
           {posts.map((post) => (
-            <PostCard key={post.id} post={post} />
+            <PostRow key={post.id} post={post} />
           ))}
         </div>
       )}
+    </div>
     </div>
   )
 }
